@@ -11,7 +11,7 @@ A comprehensive JVM memory calculator compatible with Paketo buildpacks (Temurin
 
 ## Features
 
-- 🐳 **Container Memory Detection**: Automatically detects memory limits from cgroups v1/v2
+- 🐳 **Container Memory Detection**: Automatically detects memory limits from cgroups v1/v2 with host system fallback
 - 📦 **Buildpack Compatibility**: Full integration with Paketo Temurin and Liberica buildpacks
 - 🎛️ **Flexible Configuration**: All parameters configurable via command line
 - 📏 **Memory Units Support**: Supports B, K, KB, M, MB, G, GB, T, TB with decimal values
@@ -23,7 +23,7 @@ A comprehensive JVM memory calculator compatible with Paketo buildpacks (Temurin
 ### Basic Usage
 
 ```bash
-# Use automatic container memory detection
+# Use automatic memory detection (cgroups + host fallback)
 ./memory-calculator
 
 # Specify memory and thread count
@@ -61,9 +61,11 @@ JAVA_TOOL_OPTIONS=-XX:MaxDirectMemorySize=10M -Xmx324661K -XX:MaxMetaspaceSize=2
 
 Download the latest release from the [GitHub Releases](https://github.com/patbaumgartner/memory-calculator/releases) page.
 
-**Supported Platforms:**
-- Linux (amd64, arm64)
-- macOS (amd64, arm64/Apple Silicon)
+### Platform Support
+
+- **Linux**: Full support for cgroups v1/v2 and host detection via `/proc/meminfo`
+- **macOS**: Host detection via heuristic methods (no cgroups)  
+- **Docker/Containers**: All container runtimes on supported platforms
 
 ### Build from Source
 
@@ -164,7 +166,7 @@ Current test coverage: **75.2%** (significantly improved through professional re
 
 | Flag | Description | Default | Example |
 |------|-------------|---------|---------|
-| `--total-memory` | Total available memory | Auto-detect from cgroups | `2G`, `512M`, `1024MB` |
+| `--total-memory` | Total available memory | Auto-detect from cgroups/host | `2G`, `512M`, `1024MB` |
 | `--thread-count` | JVM thread count | `250` | `500` |
 | `--loaded-class-count` | Expected loaded classes | `35000` | `40000` |
 | `--head-room` | Memory head room percentage | `0` | `10` |
@@ -188,6 +190,32 @@ The calculator respects buildpack environment variables:
 - `BPL_JVM_THREAD_COUNT`: Default thread count
 - `BPL_JVM_LOADED_CLASS_COUNT`: Default loaded class count
 - `BPL_JVM_HEAD_ROOM`: Default head room percentage
+
+### Memory Detection
+
+The memory calculator automatically detects available memory using a prioritized approach:
+
+1. **Container cgroups v2**: `/sys/fs/cgroup/memory.max` (highest priority)
+2. **Container cgroups v1**: `/sys/fs/cgroup/memory/memory.limit_in_bytes`
+3. **Host system memory**: Platform-specific fallback (lowest priority)
+
+**Platform Support:**
+- **Linux**: Reads `/proc/meminfo` for accurate system memory
+- **macOS**: Uses heuristic-based detection (CGO-free)
+- **Other platforms**: Memory detection not supported
+
+**Detection Priority:**
+```bash
+# In containers: Uses cgroups limit
+docker run --memory=2g my-app
+./memory-calculator  # Detects: 2.00 GB
+
+# On host systems: Uses system memory  
+./memory-calculator  # Detects: 16.00 GB (example)
+
+# Manual override always takes priority
+./memory-calculator --total-memory 4G  # Uses: 4.00 GB
+```
 
 ### Integration Examples
 
@@ -234,7 +262,10 @@ spec:
 
 ### Memory Calculation Algorithm
 
-1. **Container Detection**: Reads memory limits from cgroups v1/v2
+1. **Memory Detection**: Automatically detects memory limits from:
+   - Container cgroups v2 (`/sys/fs/cgroup/memory.max`)
+   - Container cgroups v1 (`/sys/fs/cgroup/memory/memory.limit_in_bytes`)  
+   - Host system memory (Linux: `/proc/meminfo`, macOS: heuristic-based)
 2. **Memory Allocation**: Distributes memory across JVM components
 3. **Heap Calculation**: Calculates max heap with head room
 4. **Stack Allocation**: Thread stack size based on thread count

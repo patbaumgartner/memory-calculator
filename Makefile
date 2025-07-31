@@ -14,6 +14,18 @@ GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 GOMOD=$(GOCMD) mod
 
+# Go tool paths
+GOPATH=$(shell $(GOCMD) env GOPATH)
+GOBIN=$(shell $(GOCMD) env GOBIN)
+ifeq ($(GOBIN),)
+GOBIN=$(GOPATH)/bin
+endif
+
+# Tool binaries (with fallback paths)
+GOLANGCI_LINT=$(shell command -v golangci-lint 2>/dev/null || echo "$(GOBIN)/golangci-lint")
+GOSEC=$(shell command -v gosec 2>/dev/null || echo "$(GOBIN)/gosec")
+GOVULNCHECK=$(shell command -v govulncheck 2>/dev/null || echo "$(GOBIN)/govulncheck")
+
 # Build flags
 LDFLAGS=-ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.commitHash=$(COMMIT_HASH)"
 
@@ -21,9 +33,9 @@ LDFLAGS=-ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X 
 DIST_DIR=dist
 COVERAGE_DIR=coverage
 
-.PHONY: all build build-all clean test test-coverage coverage coverage-html deps help vulncheck
+.PHONY: all build build-all clean test test-coverage coverage coverage-html benchmark benchmark-compare deps tools tools-check security security-install vuln-check vulncheck vuln-install format quality lint lint-install dev dev-test install release-check help
 
-all: clean deps test build
+all: clean deps test build ## Build everything (clean, deps, test, build)
 
 ## Build commands
 build: ## Build binary for current platform
@@ -85,27 +97,46 @@ deps: ## Download dependencies
 	$(GOMOD) download
 	$(GOMOD) tidy
 
+tools: ## Install all required development tools
+	@echo "Installing development tools..."
+	@echo "Installing golangci-lint..."
+	$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	@echo "Installing gosec..."
+	$(GOCMD) install github.com/securego/gosec/v2/cmd/gosec@latest
+	@echo "Installing govulncheck..."
+	$(GOCMD) install golang.org/x/vuln/cmd/govulncheck@latest
+	@echo "All tools installed to $(GOBIN)/"
+	@echo "Make sure $(GOBIN) is in your PATH"
+
+tools-check: ## Check if all tools are available
+	@echo "Checking development tools..."
+	@echo -n "golangci-lint: "; if [ -x "$(GOLANGCI_LINT)" ]; then echo "✓ found at $(GOLANGCI_LINT)"; else echo "✗ not found"; fi
+	@echo -n "gosec: "; if [ -x "$(GOSEC)" ]; then echo "✓ found at $(GOSEC)"; else echo "✗ not found"; fi
+	@echo -n "govulncheck: "; if [ -x "$(GOVULNCHECK)" ]; then echo "✓ found at $(GOVULNCHECK)"; else echo "✗ not found"; fi
+
 ## Security commands
 security: ## Run security checks
 	@echo "Running security checks..."
-	@if command -v gosec >/dev/null 2>&1; then \
-		gosec ./...; \
+	@if [ -x "$(GOSEC)" ]; then \
+		$(GOSEC) ./...; \
 	else \
-		echo "gosec not installed. Install with: go install github.com/securego/gosec/v2/cmd/gosec@latest"; \
+		echo "gosec not found. Installing..."; \
+		$(GOCMD) install github.com/securego/gosec/v2/cmd/gosec@latest; \
+		$(GOBIN)/gosec ./...; \
 	fi
 
 security-install: ## Install security tools
 	@echo "Installing security tools..."
-	go install github.com/securego/gosec/v2/cmd/gosec@latest
+	$(GOCMD) install github.com/securego/gosec/v2/cmd/gosec@latest
 
 vuln-check: ## Check for known vulnerabilities
 	@echo "Checking for vulnerabilities..."
-	@if command -v govulncheck >/dev/null 2>&1; then \
-		govulncheck ./...; \
-	elif [ -f ~/go/bin/govulncheck ]; then \
-		~/go/bin/govulncheck ./...; \
+	@if [ -x "$(GOVULNCHECK)" ]; then \
+		$(GOVULNCHECK) ./...; \
 	else \
-		echo "govulncheck not installed. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+		echo "govulncheck not found. Installing..."; \
+		$(GOCMD) install golang.org/x/vuln/cmd/govulncheck@latest; \
+		$(GOBIN)/govulncheck ./...; \
 	fi
 
 vulncheck: ## Check for known vulnerabilities (alias for vuln-check)
@@ -113,7 +144,7 @@ vulncheck: ## Check for known vulnerabilities (alias for vuln-check)
 
 vuln-install: ## Install vulnerability checker
 	@echo "Installing vulnerability checker..."
-	go install golang.org/x/vuln/cmd/govulncheck@latest
+	$(GOCMD) install golang.org/x/vuln/cmd/govulncheck@latest
 
 ## Utility commands
 clean: ## Clean build artifacts
@@ -127,18 +158,27 @@ format: ## Format Go code
 	@echo "Formatting code..."
 	gofmt -s -w .
 
+quality: ## Run all quality checks (format, lint, security, vulnerabilities)
+	@echo "Running comprehensive quality checks..."
+	@$(MAKE) format
+	@$(MAKE) lint
+	@$(MAKE) security
+	@$(MAKE) vulncheck
+	@echo "All quality checks completed ✓"
+
 lint: ## Run linter (requires golangci-lint)
 	@echo "Running linter..."
-	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run; \
+	@if [ -x "$(GOLANGCI_LINT)" ]; then \
+		$(GOLANGCI_LINT) run; \
 	else \
-		echo "golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
-		exit 1; \
+		echo "golangci-lint not found. Installing..."; \
+		$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
+		$(GOBIN)/golangci-lint run; \
 	fi
 
 lint-install: ## Install golangci-lint
 	@echo "Installing golangci-lint..."
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 ## Development commands
 dev: ## Run in development mode
@@ -150,8 +190,8 @@ dev-test: ## Run with test parameters
 	$(GOCMD) run ./cmd/memory-calculator --total-memory 2G --thread-count 250
 
 install: build ## Install binary to GOPATH/bin
-	@echo "Installing $(BINARY_NAME) to $(GOPATH)/bin..."
-	cp $(BINARY_NAME) $(GOPATH)/bin/
+	@echo "Installing $(BINARY_NAME) to $(GOBIN)..."
+	cp $(BINARY_NAME) $(GOBIN)/
 
 ## Release commands
 release-check: ## Check if ready for release

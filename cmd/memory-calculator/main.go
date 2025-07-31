@@ -61,7 +61,7 @@ func main() {
 	memoryParser := memory.NewParser()
 	cgroupsDetector := cgroups.NewDetector()
 
-	// Detect container memory from cgroups
+	// Detect container memory from cgroups with host fallback
 	containerMemory := cgroupsDetector.DetectContainerMemory()
 
 	// Determine final memory to use
@@ -89,9 +89,9 @@ func main() {
 
 	if !cfg.Quiet {
 		if finalMemory > 0 {
-			log.Printf("Container memory detected: %s", memoryParser.FormatMemory(finalMemory))
+			log.Printf("Memory detected: %s", memoryParser.FormatMemory(finalMemory))
 		} else {
-			log.Println("No memory limit detected, using system defaults")
+			log.Println("No memory limit detected from cgroups or host, using system defaults")
 		}
 	}
 

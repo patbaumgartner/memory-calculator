@@ -70,6 +70,8 @@ internal/
 - **Memory Parsing**: 30+ test cases covering all supported units and edge cases
 - **Memory Formatting**: 15+ test cases covering byte to human-readable conversion  
 - **Container Detection**: Comprehensive cgroups v1/v2 testing with mock file systems
+- **Host Memory Detection**: Cross-platform memory detection with platform-specific testing
+- **Memory Detection Fallback**: Tests prioritized detection (cgroups → host fallback)
 - **Configuration Management**: Environment variables and validation testing
 - **Display Formatting**: Output formatting for both standard and quiet modes
 - **Error Handling**: Structured error types with context and wrapping
@@ -88,19 +90,21 @@ internal/
 | `pkg/errors` | **100%** | Structured error types, error wrapping, context |
 | `internal/config` | **100%** | Configuration validation, environment variables |
 | `internal/display` | **100%** | Output formatting, JVM flag extraction |
-| `internal/memory` | **95.7%** | Memory parsing, formatting, validation |
-| `internal/cgroups` | **94.6%** | Container memory detection, cgroups v1/v2 |
+| `internal/memory` | **98.2%** | Memory parsing, formatting, validation |
+| `internal/host` | **98.5%** | Host memory detection, cross-platform support |
+| `internal/cgroups` | **95.1%** | Container memory detection, cgroups v1/v2, host fallback |
 | `cmd/memory-calculator` | **0%** | Main function (tested via integration) |
-| **Overall** | **75.2%** | **Significantly improved from 53.5%** |
+| **Overall** | **76.4%** | **Enhanced with host detection support** |
 
 ### Performance Tests (Benchmarks)
 - **Memory Parsing Performance** (`internal/memory`): Benchmarks for different memory unit formats
 - **Memory Formatting Performance** (`internal/memory`): Benchmarks for different memory sizes  
 - **Container Detection Performance** (`internal/cgroups`): Benchmarks for cgroups memory detection
+- **Host Detection Performance** (`internal/host`): Benchmarks for cross-platform host memory detection
 - **Display Performance** (`internal/display`): Benchmarks for output formatting and JVM flag extraction
 - **Main Execution Performance** (`integration`): End-to-end application performance testing
 
-## Test Coverage: 75.2% 🎯
+## Test Coverage: 76.4% 🎯
 
 ### Fully Covered Areas ✅
 ✅ Memory string parsing and validation (95.7%)
@@ -109,12 +113,15 @@ internal/
 ✅ Container memory detection (94.6%)
 ✅ Error handling with structured types (100%)
 ✅ Output formatting and display (100%)
-✅ Environment variable management (100%)
+✅ Environment variable management (100%)  
+✅ Host memory detection across platforms (98.5%)
+✅ Memory detection fallback priority testing (95.1%)
 ✅ Integration with Paketo buildpack memory calculator
 
 ### Areas with Limited Coverage ⚠️
 ⚠️ Main function execution (covered by integration tests)
 ⚠️ Some edge cases in cgroups file reading  
+⚠️ Platform-specific system calls (Darwin/Windows use heuristics)
 ⚠️ Complex system-specific behavior
 
 ## Architecture Benefits
@@ -149,6 +156,9 @@ go test ./internal/memory -v
 
 # Container detection tests  
 go test ./internal/cgroups -v
+
+# Host memory detection tests
+go test ./internal/host -v
 
 # Display formatting tests
 go test ./internal/display -v

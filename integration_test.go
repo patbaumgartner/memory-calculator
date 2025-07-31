@@ -272,6 +272,99 @@ func TestMainBoundaryValues(t *testing.T) {
 	}
 }
 
+func TestMainHostMemoryDetection(t *testing.T) {
+	// Build the binary for testing
+	binaryPath := filepath.Join(t.TempDir(), "memory-calculator")
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to build binary: %v", err)
+	}
+	defer os.Remove(binaryPath)
+
+	tests := []struct {
+		name        string
+		args        []string
+		description string
+	}{
+		{
+			name:        "Host memory auto-detection",
+			args:        []string{},
+			description: "Should detect host memory when no memory is specified",
+		},
+		{
+			name:        "Manual memory override",
+			args:        []string{"--total-memory", "2G"},
+			description: "Should use specified memory over auto-detection",
+		},
+		{
+			name:        "Host detection with quiet mode",
+			args:        []string{"--quiet"},
+			description: "Should auto-detect host memory in quiet mode",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.Command(binaryPath, tt.args...)
+			cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
+
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Errorf("Command failed: %v. Output: %s", err, output)
+				return
+			}
+
+			outputStr := string(output)
+
+			// Verify output contains memory detection message (unless quiet mode)
+			hasQuiet := false
+			for _, arg := range tt.args {
+				if arg == "--quiet" {
+					hasQuiet = true
+					break
+				}
+			}
+
+			if !hasQuiet {
+				// Should contain memory detection message
+				if !strings.Contains(outputStr, "Memory detected:") {
+					t.Errorf("Expected memory detection message in output. Got: %s", outputStr)
+				}
+
+				// Check if manual override was used
+				hasManualMemory := false
+				for _, arg := range tt.args {
+					if arg == "2G" {
+						hasManualMemory = true
+						break
+					}
+				}
+
+				if hasManualMemory {
+					// Manual override should show "2.00 GB"
+					if !strings.Contains(outputStr, "2.00 GB") {
+						t.Errorf("Expected manual memory setting (2.00 GB) in output. Got: %s", outputStr)
+					}
+				} else {
+					// Auto-detection should show some positive memory value
+					if !strings.Contains(outputStr, "GB") && !strings.Contains(outputStr, "MB") {
+						t.Errorf("Expected auto-detected memory value in output. Got: %s", outputStr)
+					}
+				}
+			}
+
+			// All outputs should contain JVM options
+			if !strings.Contains(outputStr, "-Xmx") {
+				t.Errorf("Expected JVM max heap option (-Xmx) in output. Got: %s", outputStr)
+			}
+
+			if !hasQuiet && !strings.Contains(outputStr, "JAVA_TOOL_OPTIONS") {
+				t.Errorf("Expected JAVA_TOOL_OPTIONS in output. Got: %s", outputStr)
+			}
+		})
+	}
+}
+
 // Benchmark test for the main application
 func BenchmarkMainExecution(b *testing.B) {
 	// Build the binary for testing
