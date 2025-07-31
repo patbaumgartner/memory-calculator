@@ -54,7 +54,7 @@ func TestReadCgroupsV1(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock cgroups directory structure
 			cgroupDir := filepath.Join(tempDir, "sys", "fs", "cgroup", "memory")
-			err := os.MkdirAll(cgroupDir, 0755)
+			err := os.MkdirAll(cgroupDir, 0o755)
 			if err != nil {
 				t.Fatalf("Failed to create mock cgroup directory: %v", err)
 			}
@@ -62,7 +62,7 @@ func TestReadCgroupsV1(t *testing.T) {
 			filePath := filepath.Join(cgroupDir, "memory.limit_in_bytes")
 
 			if tt.createFile {
-				err := os.WriteFile(filePath, []byte(tt.fileContent), 0644)
+				err := os.WriteFile(filePath, []byte(tt.fileContent), 0o644)
 				if err != nil {
 					t.Fatalf("Failed to create mock cgroup file: %v", err)
 				}
@@ -121,7 +121,7 @@ func TestReadCgroupsV2(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create mock cgroups directory structure
 			cgroupDir := filepath.Join(tempDir, "sys", "fs", "cgroup")
-			err := os.MkdirAll(cgroupDir, 0755)
+			err := os.MkdirAll(cgroupDir, 0o755)
 			if err != nil {
 				t.Fatalf("Failed to create mock cgroup directory: %v", err)
 			}
@@ -129,7 +129,7 @@ func TestReadCgroupsV2(t *testing.T) {
 			filePath := filepath.Join(cgroupDir, "memory.max")
 
 			if tt.createFile {
-				err := os.WriteFile(filePath, []byte(tt.fileContent), 0644)
+				err := os.WriteFile(filePath, []byte(tt.fileContent), 0o644)
 				if err != nil {
 					t.Fatalf("Failed to create mock cgroup file: %v", err)
 				}
