@@ -1,0 +1,69 @@
+name: Question
+description: Ask a question about using JVM Memory Calculator
+title: "[QUESTION] "
+labels: ["question", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a question about JVM Memory Calculator? We're here to help!
+        
+        **Before asking:** Please check the [README](https://github.com/patbaumgartner/memory-calculator/blob/main/README.md) and [documentation](https://github.com/patbaumgartner/memory-calculator/tree/main) first.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: How do I...?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Question Category
+      description: What area is your question about?
+      options:
+        - Installation & Setup
+        - Usage & Configuration
+        - Memory Calculation Logic
+        - Container Integration
+        - Buildpack Integration
+        - Troubleshooting
+        - Performance
+        - Contributing
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Provide context about your environment and what you're trying to achieve
+      placeholder: |
+        - What are you trying to do?
+        - What environment are you using?
+        - What have you already tried?
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment (if relevant)
+      description: Please provide information about your environment if it's relevant to your question
+      value: |
+        - OS: [e.g., Linux, macOS]
+        - Architecture: [e.g., amd64, arm64]
+        - Memory Calculator Version: [e.g., v1.0.0]
+        - Container Runtime: [e.g., Docker, Podman, none]
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues and discussions
+          required: true
+        - label: I have checked the documentation
+          required: true
