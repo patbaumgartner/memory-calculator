@@ -28,6 +28,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # Final stage
 FROM alpine:latest
 
+# Bring build args to final stage
+ARG VERSION=dev
+ARG BUILD_TIME
+ARG COMMIT_HASH
+
 # Install ca-certificates for HTTPS requests
 RUN apk --no-cache add ca-certificates
 
@@ -55,3 +60,5 @@ CMD ["--help"]
 LABEL maintainer="Patrick Baumgartner <contact@patbaumgartner.com>"
 LABEL description="JVM Memory Calculator for Container Environments"
 LABEL version="${VERSION}"
+LABEL build.time="${BUILD_TIME}"
+LABEL build.commit="${COMMIT_HASH}"
