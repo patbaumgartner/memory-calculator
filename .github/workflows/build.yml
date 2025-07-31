@@ -15,7 +15,6 @@ permissions:
 
 env:
   GO_VERSION: '1.24.5'
-  CGO_ENABLED: 1
 
 jobs:
   test:
@@ -131,6 +130,7 @@ jobs:
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
+        CGO_ENABLED: 0  # Disable CGO for cross-compilation
       run: |
         # Set version and build info
         VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev-${GITHUB_SHA::8}")
@@ -143,7 +143,8 @@ jobs:
         # Build with ldflags
         BINARY_NAME="memory-calculator-${{ matrix.goos }}-${{ matrix.goarch }}"
         
-        # Build with ldflags
+        echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}..."
+        # Build with ldflags and disabled CGO for cross-compilation
         go build \
           -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH}" \
           -o "dist/${BINARY_NAME}" \
@@ -201,7 +202,7 @@ jobs:
           BINARY_NAME="memory-calculator-${GOOS}-${GOARCH}"
           
           echo "Building for $GOOS/$GOARCH..."
-          env GOOS="$GOOS" GOARCH="$GOARCH" go build \
+          env GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build \
             -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH}" \
             -o "dist/${BINARY_NAME}" \
             ./cmd/memory-calculator

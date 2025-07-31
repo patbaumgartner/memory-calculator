@@ -26,9 +26,21 @@ go list ./...
 
 echo ""
 echo "🏗️ Testing build process..."
-go build -o test-binary ./cmd/memory-calculator
+CGO_ENABLED=0 go build -o test-binary ./cmd/memory-calculator
 ./test-binary --version
 rm test-binary
+
+echo ""
+echo "🌍 Testing cross-compilation..."
+echo "Building for linux/arm64..."
+CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o test-binary-arm64 ./cmd/memory-calculator
+echo "✅ ARM64 build successful"
+rm test-binary-arm64
+
+echo "Building for darwin/amd64..."
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o test-binary-darwin ./cmd/memory-calculator
+echo "✅ Darwin build successful"
+rm test-binary-darwin
 
 echo ""
 echo "📦 Download dependencies..."
