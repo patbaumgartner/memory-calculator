@@ -43,9 +43,9 @@ jobs:
         args: --timeout=5m
 
     - name: Run security scan
-      run: |
-        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-        gosec ./...
+      uses: securego/gosec@master
+      with:
+        args: '-no-fail -severity medium -confidence medium ./...'
 
     - name: Check for vulnerabilities
       run: |

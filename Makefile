@@ -2,7 +2,13 @@
 
 # Build variables
 BINARY_NAME=memory-calculator
-VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+VERsecurity: ## Run security checks
+	@echo "Running security checks..."
+	@if command -v gosec >/dev/null 2>&1; then \
+		gosec -severity medium -confidence medium ./...; \
+	else \
+		echo "gosec not installed. Install with: make security-install"; \
+	fi(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 COMMIT_HASH=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
@@ -93,7 +99,7 @@ security: ## Run security checks
 
 security-install: ## Install security tools
 	@echo "Installing security tools..."
-	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+	go install github.com/securego/gosec/v2/cmd/gosec@latest
 
 vuln-check: ## Check for known vulnerabilities
 	@echo "Checking for vulnerabilities..."
