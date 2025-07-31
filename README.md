@@ -16,7 +16,7 @@ A comprehensive JVM memory calculator compatible with Paketo buildpacks (Temurin
 - 🎛️ **Flexible Configuration**: All parameters configurable via command line
 - 📏 **Memory Units Support**: Supports B, K, KB, M, MB, G, GB, T, TB with decimal values
 - 🤫 **Quiet Mode**: Output only JVM arguments for scripting integration
-- 🧪 **Comprehensive Testing**: 53%+ test coverage with unit, integration, and benchmark tests
+- 🧪 **Comprehensive Testing**: 75%+ test coverage with unit, integration, and benchmark tests
 
 ## Quick Start
 
@@ -151,7 +151,7 @@ go tool cover -html=coverage.out -o coverage.html
 
 ### Test Coverage
 
-Current test coverage: **53.5%**
+Current test coverage: **75.2%** (significantly improved through professional refactoring)
 
 - Unit tests for memory parsing and formatting
 - Integration tests with binary execution

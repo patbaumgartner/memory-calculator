@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.24.5-alpine AS builder
 
 # Install git (needed for version info)
 RUN apk add --no-cache git
@@ -23,7 +23,7 @@ ARG COMMIT_HASH
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -w -s" \
     -a -installsuffix cgo \
-    -o memory-calculator .
+    -o memory-calculator ./cmd/memory-calculator
 
 # Final stage
 FROM alpine:latest

@@ -2,13 +2,7 @@
 
 # Build variables
 BINARY_NAME=memory-calculator
-VERsecurity: ## Run security checks
-	@echo "Running security checks..."
-	@if command -v gosec >/dev/null 2>&1; then \
-		gosec -severity medium -confidence medium ./...; \
-	else \
-		echo "gosec not installed. Install with: make security-install"; \
-	fi(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 COMMIT_HASH=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
@@ -27,14 +21,14 @@ LDFLAGS=-ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X 
 DIST_DIR=dist
 COVERAGE_DIR=coverage
 
-.PHONY: all build build-all clean test test-coverage coverage-html deps help
+.PHONY: all build build-all clean test test-coverage coverage coverage-html deps help vulncheck
 
 all: clean deps test build
 
 ## Build commands
 build: ## Build binary for current platform
 	@echo "Building $(BINARY_NAME) for current platform..."
-	$(GOBUILD) $(LDFLAGS) -o $(BINARY_NAME) .
+	$(GOBUILD) $(LDFLAGS) -o $(BINARY_NAME) ./cmd/memory-calculator
 	@echo "Build complete: $(BINARY_NAME)"
 
 build-all: ## Build binaries for all platforms
@@ -42,16 +36,16 @@ build-all: ## Build binaries for all platforms
 	@mkdir -p $(DIST_DIR)
 	
 	# Linux amd64
-	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 .
+	GOOS=linux GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/memory-calculator
 	
 	# Linux arm64
-	GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 .
+	GOOS=linux GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/memory-calculator
 	
 	# macOS amd64
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 .
+	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/memory-calculator
 	
 	# macOS arm64 (Apple Silicon)
-	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 .
+	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/memory-calculator
 	
 	@echo "Cross-platform build complete. Binaries in $(DIST_DIR)/"
 	@ls -la $(DIST_DIR)/
@@ -66,6 +60,9 @@ test-coverage: ## Run tests with coverage
 	@mkdir -p $(COVERAGE_DIR)
 	$(GOTEST) -v -coverprofile=$(COVERAGE_DIR)/coverage.out ./...
 	$(GOCMD) tool cover -func=$(COVERAGE_DIR)/coverage.out
+
+coverage: ## Run tests with coverage (alias for test-coverage)
+	@$(MAKE) test-coverage
 
 coverage-html: test-coverage ## Generate HTML coverage report
 	@echo "Generating HTML coverage report..."
@@ -94,7 +91,7 @@ security: ## Run security checks
 	@if command -v gosec >/dev/null 2>&1; then \
 		gosec ./...; \
 	else \
-		echo "gosec not installed. Install with: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest"; \
+		echo "gosec not installed. Install with: go install github.com/securego/gosec/v2/cmd/gosec@latest"; \
 	fi
 
 security-install: ## Install security tools
@@ -105,9 +102,14 @@ vuln-check: ## Check for known vulnerabilities
 	@echo "Checking for vulnerabilities..."
 	@if command -v govulncheck >/dev/null 2>&1; then \
 		govulncheck ./...; \
+	elif [ -f ~/go/bin/govulncheck ]; then \
+		~/go/bin/govulncheck ./...; \
 	else \
 		echo "govulncheck not installed. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
 	fi
+
+vulncheck: ## Check for known vulnerabilities (alias for vuln-check)
+	@$(MAKE) vuln-check
 
 vuln-install: ## Install vulnerability checker
 	@echo "Installing vulnerability checker..."
@@ -141,11 +143,11 @@ lint-install: ## Install golangci-lint
 ## Development commands
 dev: ## Run in development mode
 	@echo "Running in development mode..."
-	$(GOCMD) run . --help
+	$(GOCMD) run ./cmd/memory-calculator --help
 
 dev-test: ## Run with test parameters
 	@echo "Running with test parameters..."
-	$(GOCMD) run . --total-memory 2G --thread-count 250
+	$(GOCMD) run ./cmd/memory-calculator --total-memory 2G --thread-count 250
 
 install: build ## Install binary to GOPATH/bin
 	@echo "Installing $(BINARY_NAME) to $(GOPATH)/bin..."

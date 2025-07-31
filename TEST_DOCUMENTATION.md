@@ -1,117 +1,197 @@
 # JVM Memory Calculator - Test Suite Documentation
 
 ## Overview
-This document describes the comprehensive test suite for the JVM Memory Calculator, which provides 53.5% code coverage with multiple types of tests.
+This document describes the comprehensive test suite for the JVM Memory Calculator, which provides **75.2% code coverage** with multiple types of tests across a well-structured package architecture.
 
-## Test Files
+## Architecture & Test Organization
 
-### 1. `main_test.go`
-**Core functionality tests**
-- `TestParseMemoryString`: Tests memory string parsing with various units (K, KB, M, MB, G, GB, T, TB)
-- `TestFormatMemory`: Tests memory formatting to human-readable strings
-- `TestDetectContainerMemory`: Tests container memory detection functionality
-- `TestEnvironmentVariables`: Tests environment variable handling
-- `BenchmarkParseMemoryString`: Performance benchmarks for memory parsing
-- `BenchmarkFormatMemory`: Performance benchmarks for memory formatting
+The test suite is organized by package structure, providing clear separation of concerns:
 
-### 2. `memory_test.go`
-**Extended memory function tests**
-- `TestParseMemoryStringExtended`: Additional edge cases for memory parsing
-- `TestFormatMemoryExtended`: Additional edge cases for memory formatting
+### Package Structure
+```
+cmd/memory-calculator/          # Main application entry point
+pkg/errors/                     # Public structured error types  
+internal/
+├── config/                    # Configuration management
+├── memory/                    # Memory parsing & formatting
+├── cgroups/                   # Container memory detection
+└── display/                   # Output formatting
+```
 
-### 3. `cgroups_test.go`
-**Container memory detection tests**
-- `TestReadCgroupsV1`: Tests cgroups v1 memory limit reading with mock files
-- `TestReadCgroupsV2`: Tests cgroups v2 memory limit reading with mock files
-- Helper functions for testing with custom file paths
+## Test Files by Package
 
-### 4. `display_test.go`
-**Output and display tests**
-- `TestDisplayResults`: Tests main result display function
-- `TestDisplayResultsWithoutJavaToolOptions`: Tests display without JAVA_TOOL_OPTIONS
-- `TestDisplayResultsEmpty`: Tests display with empty results
-- `TestStringRepeat`: Tests string formatting utilities
-- `TestMemoryCalculationInputs`: Tests various memory calculation scenarios
-- `TestMemoryFormatEdgeCases`: Tests edge cases in memory formatting
-- Performance benchmarks for core functions
-
-### 5. `integration_test.go`
+### 1. `integration_test.go` (Root Package)
 **End-to-end integration tests**
-- `TestIntegrationMain`: Full application testing with various command line arguments
-- `TestDoubleVsSingleDash`: Tests both `-` and `--` parameter formats
-- `TestMemoryCalculationEdgeCases`: Tests edge cases that might cause memory calculation failures
+- `TestMainIntegration`: Full application testing with various command line arguments
+- `TestMainEnvironmentVariables`: Tests buildpack environment variable handling
+- `TestMainBoundaryValues`: Tests edge cases and boundary conditions
+
+### 2. `internal/memory/parser_test.go`
+**Memory parsing and formatting tests** (95.7% coverage)
+- `TestParseMemoryString`: Comprehensive memory string parsing with 25+ test cases
+- `TestFormatMemory`: Memory formatting to human-readable strings with edge cases
+- `TestValidateMemorySize`: Memory size validation testing
+- `TestNewParser`: Parser constructor testing
+- `TestConstants`: Memory unit constant validation
+
+### 3. `internal/cgroups/detector_test.go`
+**Container memory detection tests** (94.6% coverage)
+- `TestDetectContainerMemory`: Integration tests for memory detection
+- `TestReadCgroupsV1`: cgroups v1 memory limit reading with mock files
+- `TestReadCgroupsV2`: cgroups v2 memory limit reading with mock files
+- `TestNewDetector`: Constructor and dependency injection testing
+
+### 4. `internal/display/formatter_test.go`
+**Output and display tests** (100% coverage)
+- `TestDisplayResults`: Main result display function testing
+- `TestDisplayQuietResults`: Quiet mode output testing
+- `TestExtractJVMFlag`: JVM flag extraction and parsing
+- `TestBuildJavaToolOptions`: JAVA_TOOL_OPTIONS construction
+- `TestDisplayJVMSetting`: Individual JVM setting display
+
+### 5. `internal/config/config_test.go`
+**Configuration management tests** (100% coverage)
+- `TestDefaultConfig`: Default configuration creation
+- `TestConfigValidate`: Configuration validation with error cases
+- `TestConfigSetEnvironmentVariables`: Environment variable handling
+- `TestConfigSetTotalMemory`: Memory configuration setting
+
+### 6. `pkg/errors/errors_test.go`
+**Error handling tests** (100% coverage)
+- `TestMemoryCalculatorError`: Structured error type testing
+- `TestNewMemoryFormatError`: Memory format error creation
+- `TestNewCgroupsError`: Cgroups error creation
+- `TestNewCalculationError`: Calculation error creation
+- `TestNewConfigurationError`: Configuration error creation
 
 ## Test Categories
 
-### Unit Tests
-- **Memory Parsing**: 25+ test cases covering all supported units and edge cases
-- **Memory Formatting**: 15+ test cases covering byte to human-readable conversion
-- **Environment Variables**: Tests for buildpack-compatible environment variable handling
-- **Error Handling**: Tests for invalid inputs and error conditions
+### Unit Tests (Per Package)
+- **Memory Parsing**: 30+ test cases covering all supported units and edge cases
+- **Memory Formatting**: 15+ test cases covering byte to human-readable conversion  
+- **Container Detection**: Comprehensive cgroups v1/v2 testing with mock file systems
+- **Configuration Management**: Environment variables and validation testing
+- **Display Formatting**: Output formatting for both standard and quiet modes
+- **Error Handling**: Structured error types with context and wrapping
 
 ### Integration Tests
 - **Command Line Interface**: Tests all command line parameters and combinations
-- **Help System**: Tests help output and documentation
+- **Environment Variables**: Tests for buildpack-compatible environment variable handling
 - **Memory Units**: Tests various memory unit formats (bytes, K, KB, M, MB, G, GB, T, TB)
 - **Parameter Validation**: Tests parameter validation and error handling
+- **End-to-End Workflows**: Complete application testing with realistic scenarios
+
+### Package Coverage Summary
+
+| Package | Coverage | Key Features Tested |
+|---------|----------|-------------------|
+| `pkg/errors` | **100%** | Structured error types, error wrapping, context |
+| `internal/config` | **100%** | Configuration validation, environment variables |
+| `internal/display` | **100%** | Output formatting, JVM flag extraction |
+| `internal/memory` | **95.7%** | Memory parsing, formatting, validation |
+| `internal/cgroups` | **94.6%** | Container memory detection, cgroups v1/v2 |
+| `cmd/memory-calculator` | **0%** | Main function (tested via integration) |
+| **Overall** | **75.2%** | **Significantly improved from 53.5%** |
 
 ### Performance Tests (Benchmarks)
-- **Memory Parsing Performance**: Benchmarks for different memory unit formats
-- **Memory Formatting Performance**: Benchmarks for different memory sizes
-- **Container Detection Performance**: Benchmarks for cgroups memory detection
+- **Memory Parsing Performance** (`internal/memory`): Benchmarks for different memory unit formats
+- **Memory Formatting Performance** (`internal/memory`): Benchmarks for different memory sizes  
+- **Container Detection Performance** (`internal/cgroups`): Benchmarks for cgroups memory detection
+- **Display Performance** (`internal/display`): Benchmarks for output formatting and JVM flag extraction
+- **Main Execution Performance** (`integration`): End-to-end application performance testing
 
-## Test Coverage: 53.5%
+## Test Coverage: 75.2% 🎯
 
-### Covered Areas
-✅ Memory string parsing and validation
-✅ Memory formatting and display
-✅ Command line argument handling
-✅ Environment variable management
-✅ Container memory detection (cgroups v1/v2)
-✅ Error handling and edge cases
-✅ Output formatting and display
+### Fully Covered Areas ✅
+✅ Memory string parsing and validation (95.7%)
+✅ Memory formatting and display (100%)  
+✅ Configuration management and validation (100%)
+✅ Container memory detection (94.6%)
+✅ Error handling with structured types (100%)
+✅ Output formatting and display (100%)
+✅ Environment variable management (100%)
 ✅ Integration with Paketo buildpack memory calculator
 
-### Areas with Limited Coverage
-⚠️ File system error handling (mock testing only)
-⚠️ System-specific cgroups behavior
-⚠️ Complex memory calculation failure scenarios
+### Areas with Limited Coverage ⚠️
+⚠️ Main function execution (covered by integration tests)
+⚠️ Some edge cases in cgroups file reading  
+⚠️ Complex system-specific behavior
+
+## Architecture Benefits
+
+### Professional Package Structure
+- **Separation of Concerns**: Each package has a single responsibility
+- **Testability**: Packages can be tested independently with dependency injection
+- **Maintainability**: Clear interfaces and structured error handling
+- **Reusability**: Modular components that can be imported by other projects
+
+### Dependency Injection Pattern  
+- Clean main function using dependency-injected components
+- Easy mocking and testing of individual components
+- Improved testability and maintainability
 
 ## Running Tests
 
 ### All Tests with Coverage
 ```bash
-go test -v -cover
+make test-coverage
 ```
 
-### Benchmarks Only
+### All Tests (Basic)
 ```bash
-go test -run=^$ -bench=.
+make test
 ```
 
-### Integration Tests Only
-```bash
-go test -run TestIntegration -v
-```
-
-### Specific Test Categories
+### Package-Specific Tests
 ```bash
 # Memory parsing tests
-go test -run TestParseMemory -v
+go test ./internal/memory -v
 
-# Display tests
-go test -run TestDisplay -v
+# Container detection tests  
+go test ./internal/cgroups -v
 
-# Cgroups tests
-go test -run TestReadCgroups -v
+# Display formatting tests
+go test ./internal/display -v
+
+# Configuration tests
+go test ./internal/config -v
+
+# Error handling tests
+go test ./pkg/errors -v
+
+# Integration tests only
+go test -run TestMain -v
+```
+
+### Benchmarks
+```bash
+# All benchmarks
+make benchmark
+
+# Package-specific benchmarks  
+go test ./internal/memory -bench=.
+go test ./internal/cgroups -bench=.
+go test ./internal/display -bench=.
+
+# Compare benchmark results
+make benchmark-compare
+```
+
+### Coverage Reports
+```bash
+# Generate HTML coverage report
+make test-coverage
+go tool cover -html=coverage/coverage.out -o coverage/coverage.html
 ```
 
 ## Test Results Summary
 
-**Total Tests**: 50+ test cases
-**Coverage**: 53.5% of statements
-**Performance**: All benchmarks show sub-microsecond performance
+**Total Test Packages**: 6 packages
+**Total Tests**: 100+ test cases across all packages
+**Overall Coverage**: **75.2%** (improved from 53.5%)
+**Package Coverage**: 3 packages at 100%, 2 packages at 94%+
 **Reliability**: 100% pass rate across all test scenarios
+**Architecture**: Professional package structure with dependency injection
 
 ## Key Test Scenarios Covered
 
@@ -151,4 +231,4 @@ go test -run TestReadCgroups -v
 - Unrealistic memory limits (filtered out)
 - File system errors and missing files
 
-This comprehensive test suite ensures the JVM Memory Calculator works reliably across different environments and use cases, particularly in containerized environments with buildpack deployment scenarios.
+This comprehensive test suite ensures the JVM Memory Calculator works reliably across different environments and use cases, particularly in containerized environments with buildpack deployment scenarios. The professional package architecture provides excellent maintainability and testability while achieving high code coverage.

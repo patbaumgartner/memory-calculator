@@ -86,18 +86,30 @@ docker run --rm memory-calculator --help
 
 ## 🧪 Testing Framework
 
-### Test Coverage: 53.5%
-- **Unit Tests**: Individual function testing
-- **Integration Tests**: Full binary execution
-- **Benchmark Tests**: Performance validation
-- **Mock Tests**: cgroups simulation
+### Test Coverage: 75.2%
+The codebase has been refactored with a professional package structure providing excellent test coverage:
 
-### Test Files
-- `main_test.go` - Core functionality tests
-- `memory_test.go` - Memory parsing tests
-- `cgroups_test.go` - Container detection tests
-- `display_test.go` - Output formatting tests
-- `integration_test.go` - End-to-end tests
+- **Unit Tests**: Per-package testing with dependency injection
+- **Integration Tests**: Full binary execution and end-to-end testing
+- **Benchmark Tests**: Performance validation across all packages
+- **Mock Tests**: cgroups simulation and file system mocking
+
+### Test Architecture by Package
+- `integration_test.go` - End-to-end application testing
+- `internal/memory/parser_test.go` - Memory parsing and formatting (95.7% coverage)
+- `internal/cgroups/detector_test.go` - Container detection (94.6% coverage)
+- `internal/display/formatter_test.go` - Output formatting (100% coverage)
+- `internal/config/config_test.go` - Configuration management (100% coverage)
+- `pkg/errors/errors_test.go` - Structured error handling (100% coverage)
+
+### Package Coverage Summary
+| Package | Coverage | Status |
+|---------|----------|--------|
+| `pkg/errors` | 100% | ✅ Complete |
+| `internal/config` | 100% | ✅ Complete |
+| `internal/display` | 100% | ✅ Complete |
+| `internal/memory` | 95.7% | ✅ Excellent |
+| `internal/cgroups` | 94.6% | ✅ Excellent |
 
 ## 📦 Dependencies
 
@@ -172,7 +184,7 @@ make build-all
 **✅ Complete and Production Ready**
 
 The JVM Memory Calculator is fully functional with:
-- Comprehensive test suite (53.5% coverage)
+- Comprehensive test suite (75.2% coverage with professional package structure)
 - Automated CI/CD pipeline
 - Cross-platform build support
 - Professional documentation

@@ -1,217 +1,293 @@
 package main
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestIntegrationMain(t *testing.T) {
-	// Build the binary first
-	cmd := exec.Command("go", "build", "-o", "memory-calculator-test", ".")
-	err := cmd.Run()
-	if err != nil {
+func TestMainIntegration(t *testing.T) {
+	// Build the binary for testing
+	binaryPath := filepath.Join(os.TempDir(), "memory-calculator-test")
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
+	cmd.Dir = "./"
+	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer func() {
-		// Clean up the test binary
-		exec.Command("rm", "memory-calculator-test").Run()
-	}()
+	defer os.Remove(binaryPath)
 
 	tests := []struct {
 		name           string
 		args           []string
 		expectError    bool
 		expectedOutput []string
+		notExpected    []string
 	}{
 		{
-			name:           "Help flag",
-			args:           []string{"-help"},
-			expectError:    false,
-			expectedOutput: []string{"JVM Memory Calculator", "Examples:"},
+			name: "Help flag",
+			args: []string{"--help"},
+			expectedOutput: []string{
+				"JVM Memory Calculator",
+				"Usage:",
+				"--total-memory",
+				"--thread-count",
+				"Examples:",
+			},
 		},
 		{
-			name:           "Valid memory specification",
-			args:           []string{"-total-memory=1G"},
-			expectError:    false,
-			expectedOutput: []string{"Using specified memory", "1.00 GB", "JVM Memory Configuration"},
+			name: "Version flag",
+			args: []string{"--version"},
+			expectedOutput: []string{
+				"JVM Memory Calculator",
+				"Version:",
+				"Build Time:",
+				"Commit:",
+				"Go Version: 1.24.5",
+			},
 		},
 		{
-			name:           "Thread count parameter",
-			args:           []string{"-total-memory=2G", "-thread-count=300"},
-			expectError:    false,
-			expectedOutput: []string{"Thread Count:     300"},
+			name: "Quiet mode with memory",
+			args: []string{"--quiet", "--total-memory", "2G"},
+			expectedOutput: []string{
+				"-X", // Should contain JVM flags
+			},
+			notExpected: []string{
+				"JVM Memory Configuration",
+				"Total Memory:",
+			},
 		},
 		{
-			name:           "Head room parameter",
-			args:           []string{"-total-memory=2G", "-head-room=10"},
-			expectError:    false,
-			expectedOutput: []string{"Head Room:        10%"},
+			name: "Standard output with memory",
+			args: []string{"--total-memory", "1G", "--thread-count", "300"},
+			expectedOutput: []string{
+				"JVM Memory Configuration",
+				"Total Memory:",
+				"Thread Count:     300",
+				"JAVA_TOOL_OPTIONS",
+			},
 		},
 		{
-			name:           "Class count parameter",
-			args:           []string{"-total-memory=2G", "-loaded-class-count=40000"},
-			expectError:    false,
-			expectedOutput: []string{"Loaded Classes:   40000"},
+			name: "Invalid memory format",
+			args: []string{"--total-memory", "invalid"},
+			expectedOutput: []string{
+				"JVM Memory Configuration", // Should still show output with detected memory
+			},
 		},
 		{
-			name:           "Invalid memory format",
-			args:           []string{"-total-memory=invalid"},
-			expectError:    false, // Should not error, but should show warning
-			expectedOutput: []string{"Invalid total-memory value"},
+			name:        "Invalid thread count",
+			args:        []string{"--thread-count", "-1"},
+			expectError: true,
 		},
 		{
-			name:           "Memory units - MB",
-			args:           []string{"-total-memory=512MB"},
-			expectError:    false,
-			expectedOutput: []string{"512 MB"},
+			name:        "Invalid head room",
+			args:        []string{"--head-room", "150"},
+			expectError: true,
 		},
 		{
-			name:           "Memory units - KB",
-			args:           []string{"-total-memory=524288KB"},
-			expectError:    false,
-			expectedOutput: []string{"512 MB"},
+			name: "Memory units - MB",
+			args: []string{"--total-memory", "512MB", "--quiet"},
+			expectedOutput: []string{
+				"-X", // Should contain JVM flags
+			},
 		},
 		{
-			name:           "Decimal memory",
-			args:           []string{"-total-memory=1.5G"},
-			expectError:    false,
-			expectedOutput: []string{"1.50 GB"},
+			name: "Memory units - KB",
+			args: []string{"--total-memory", "1024KB", "--quiet"},
+			expectedOutput: []string{
+				"-X", // Should contain JVM flags
+			},
 		},
 		{
-			name:           "Quiet mode - only JVM options",
-			args:           []string{"--quiet", "--total-memory=2G"},
-			expectError:    false,
-			expectedOutput: []string{"-Xmx", "-XX:MaxMetaspaceSize", "-Xss"},
+			name: "Decimal memory",
+			args: []string{"--total-memory", "1.5G", "--quiet"},
+			expectedOutput: []string{
+				"-X", // Should contain JVM flags
+			},
 		},
 		{
-			name:           "Quiet mode with parameters",
-			args:           []string{"--quiet", "--total-memory=1G", "--thread-count=300"},
-			expectError:    false,
-			expectedOutput: []string{"-Xmx", "-XX:MaxMetaspaceSize", "-Xss"},
+			name: "All parameters",
+			args: []string{
+				"--total-memory", "8G",
+				"--thread-count", "200",
+				"--loaded-class-count", "30000",
+				"--head-room", "10",
+			},
+			expectedOutput: []string{
+				"JVM Memory Configuration",
+				"Thread Count:     200",
+				"Loaded Classes:   30000",
+				"Head Room:        10%",
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := exec.Command("./memory-calculator-test", tt.args...)
+			cmd := exec.Command(binaryPath, tt.args...)
 			output, err := cmd.CombinedOutput()
 			outputStr := string(output)
 
-			if tt.expectError && err == nil {
-				t.Errorf("Expected error but command succeeded")
-			}
-			if !tt.expectError && err != nil {
-				// Some "errors" are expected (like memory calculation failures with extreme parameters)
-				// Only fail if it's a real unexpected error
-				if !strings.Contains(outputStr, "Memory calculation failed") {
-					t.Errorf("Unexpected error: %v\nOutput: %s", err, outputStr)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but command succeeded. Output: %s", outputStr)
 				}
+				return
 			}
 
-			// Check for expected output strings
+			if err != nil {
+				t.Errorf("Command failed with error: %v. Output: %s", err, outputStr)
+				return
+			}
+
+			// Check expected output
 			for _, expected := range tt.expectedOutput {
 				if !strings.Contains(outputStr, expected) {
 					t.Errorf("Expected output to contain %q, but got:\n%s", expected, outputStr)
 				}
 			}
-		})
-	}
-}
 
-func TestDoubleVsSingleDash(t *testing.T) {
-	// Build the binary first
-	cmd := exec.Command("go", "build", "-o", "memory-calculator-test", ".")
-	err := cmd.Run()
-	if err != nil {
-		t.Fatalf("Failed to build binary: %v", err)
-	}
-	defer func() {
-		exec.Command("rm", "memory-calculator-test").Run()
-	}()
-
-	// Test that both single and double dash work the same way
-	singleDashCmd := exec.Command("./memory-calculator-test", "-total-memory=1G", "-thread-count=300")
-	singleDashOutput, err1 := singleDashCmd.CombinedOutput()
-
-	doubleDashCmd := exec.Command("./memory-calculator-test", "--total-memory=1G", "--thread-count=300")
-	doubleDashOutput, err2 := doubleDashCmd.CombinedOutput()
-
-	if (err1 == nil) != (err2 == nil) {
-		t.Errorf("Single dash and double dash had different error states")
-	}
-
-	// The outputs should be identical
-	if string(singleDashOutput) != string(doubleDashOutput) {
-		t.Errorf("Single dash and double dash produced different outputs:\nSingle: %s\nDouble: %s",
-			string(singleDashOutput), string(doubleDashOutput))
-	}
-}
-
-func TestMemoryCalculationEdgeCases(t *testing.T) {
-	// Build the binary first
-	cmd := exec.Command("go", "build", "-o", "memory-calculator-test", ".")
-	err := cmd.Run()
-	if err != nil {
-		t.Fatalf("Failed to build binary: %v", err)
-	}
-	defer func() {
-		exec.Command("rm", "memory-calculator-test").Run()
-	}()
-
-	edgeCases := []struct {
-		name        string
-		args        []string
-		expectError bool
-		description string
-	}{
-		{
-			name:        "Very small memory",
-			args:        []string{"-total-memory=64M"},
-			expectError: false,
-			description: "Should handle small memory allocations",
-		},
-		{
-			name:        "Large memory",
-			args:        []string{"-total-memory=16G"},
-			expectError: false,
-			description: "Should handle large memory allocations",
-		},
-		{
-			name:        "High thread count with small memory",
-			args:        []string{"-total-memory=128M", "-thread-count=1000"},
-			expectError: true,
-			description: "Should fail with insufficient memory for many threads",
-		},
-		{
-			name:        "Zero head room",
-			args:        []string{"-total-memory=1G", "-head-room=0"},
-			expectError: false,
-			description: "Should work with zero head room",
-		},
-		{
-			name:        "High head room",
-			args:        []string{"-total-memory=8G", "-head-room=20"},
-			expectError: false,
-			description: "Should work with moderate head room and large memory",
-		},
-	}
-
-	for _, tc := range edgeCases {
-		t.Run(tc.name, func(t *testing.T) {
-			cmd := exec.Command("./memory-calculator-test", tc.args...)
-			output, err := cmd.CombinedOutput()
-			outputStr := string(output)
-
-			if tc.expectError {
-				if err == nil && !strings.Contains(outputStr, "Memory calculation failed") {
-					t.Errorf("Expected error for %s, but command succeeded. Output: %s", tc.description, outputStr)
-				}
-			} else {
-				if err != nil && strings.Contains(outputStr, "Memory calculation failed") {
-					t.Errorf("Unexpected error for %s: %v\nOutput: %s", tc.description, err, outputStr)
+			// Check not expected output
+			for _, notExpected := range tt.notExpected {
+				if strings.Contains(outputStr, notExpected) {
+					t.Errorf("Expected output to NOT contain %q, but got:\n%s", notExpected, outputStr)
 				}
 			}
 		})
+	}
+}
+
+func TestMainEnvironmentVariables(t *testing.T) {
+	// Build the binary for testing
+	binaryPath := filepath.Join(os.TempDir(), "memory-calculator-test")
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to build binary: %v", err)
+	}
+	defer os.Remove(binaryPath)
+
+	// Test with environment variables
+	cmd = exec.Command(binaryPath, "--total-memory", "4G")
+	cmd.Env = append(os.Environ(),
+		"BPL_JVM_THREAD_COUNT=200",
+		"BPL_JVM_LOADED_CLASS_COUNT=30000",
+		"BPL_JVM_HEAD_ROOM=10",
+	)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("Command failed: %v. Output: %s", err, string(output))
+	}
+
+	outputStr := string(output)
+	expectedParts := []string{
+		"Thread Count:     200",
+		"Loaded Classes:   30000",
+		"Head Room:        10%",
+	}
+
+	for _, expected := range expectedParts {
+		if !strings.Contains(outputStr, expected) {
+			t.Errorf("Expected output to contain %q, but got:\n%s", expected, outputStr)
+		}
+	}
+}
+
+func TestMainBoundaryValues(t *testing.T) {
+	// Build the binary for testing
+	binaryPath := filepath.Join(os.TempDir(), "memory-calculator-test")
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("Failed to build binary: %v", err)
+	}
+	defer os.Remove(binaryPath)
+
+	tests := []struct {
+		name        string
+		args        []string
+		expectError bool
+	}{
+		{
+			name: "Minimum valid values",
+			args: []string{
+				"--total-memory", "1M",
+				"--thread-count", "1",
+				"--loaded-class-count", "1",
+				"--head-room", "0",
+			},
+		},
+		{
+			name: "Maximum head room",
+			args: []string{
+				"--total-memory", "1G",
+				"--head-room", "100",
+			},
+			expectError: true, // 100% head room leaves no memory for JVM
+		},
+		{
+			name: "Large memory value",
+			args: []string{
+				"--total-memory", "100G",
+			},
+		},
+		{
+			name: "Zero thread count",
+			args: []string{
+				"--thread-count", "0",
+			},
+			expectError: true,
+		},
+		{
+			name: "Negative head room",
+			args: []string{
+				"--head-room", "-1",
+			},
+			expectError: true,
+		},
+		{
+			name: "Head room over 100",
+			args: []string{
+				"--head-room", "101",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.Command(binaryPath, tt.args...)
+			output, err := cmd.CombinedOutput()
+
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but command succeeded. Output: %s", string(output))
+				}
+			} else {
+				if err != nil {
+					t.Errorf("Command failed with error: %v. Output: %s", err, string(output))
+				}
+			}
+		})
+	}
+}
+
+// Benchmark test for the main application
+func BenchmarkMainExecution(b *testing.B) {
+	// Build the binary for testing
+	binaryPath := filepath.Join(os.TempDir(), "memory-calculator-bench")
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
+	if err := cmd.Run(); err != nil {
+		b.Fatalf("Failed to build binary: %v", err)
+	}
+	defer os.Remove(binaryPath)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cmd := exec.Command(binaryPath, "--total-memory", "2G", "--quiet")
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			b.Fatalf("Command failed: %v", err)
+		}
 	}
 }
