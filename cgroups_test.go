@@ -12,7 +12,7 @@ import (
 func TestReadCgroupsV1(t *testing.T) {
 	// Create a temporary directory for mock cgroups files
 	tempDir := t.TempDir()
-	
+
 	tests := []struct {
 		name          string
 		fileContent   string
@@ -60,7 +60,7 @@ func TestReadCgroupsV1(t *testing.T) {
 			}
 
 			filePath := filepath.Join(cgroupDir, "memory.limit_in_bytes")
-			
+
 			if tt.createFile {
 				err := os.WriteFile(filePath, []byte(tt.fileContent), 0644)
 				if err != nil {
@@ -79,7 +79,7 @@ func TestReadCgroupsV1(t *testing.T) {
 func TestReadCgroupsV2(t *testing.T) {
 	// Create a temporary directory for mock cgroups files
 	tempDir := t.TempDir()
-	
+
 	tests := []struct {
 		name          string
 		fileContent   string
@@ -127,7 +127,7 @@ func TestReadCgroupsV2(t *testing.T) {
 			}
 
 			filePath := filepath.Join(cgroupDir, "memory.max")
-			
+
 			if tt.createFile {
 				err := os.WriteFile(filePath, []byte(tt.fileContent), 0644)
 				if err != nil {
@@ -156,12 +156,12 @@ func readCgroupsV1FromPath(path string) int64 {
 	if err != nil {
 		return 0
 	}
-	
+
 	memory, err := strconv.ParseInt(strings.TrimSpace(line), 10, 64)
 	if err != nil {
 		return 0
 	}
-	
+
 	// Check if it's a realistic limit (not the "no limit" value)
 	if memory < 1024*1024*1024*1024 { // Less than 1TB
 		return memory
@@ -181,12 +181,12 @@ func readCgroupsV2FromPath(path string) int64 {
 	if err != nil {
 		return 0
 	}
-	
+
 	line = strings.TrimSpace(line)
 	if line == "max" {
 		return 0 // No limit set
 	}
-	
+
 	if memory, err := strconv.ParseInt(line, 10, 64); err == nil {
 		return memory
 	}

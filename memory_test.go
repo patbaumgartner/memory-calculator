@@ -14,11 +14,11 @@ func TestParseMemoryStringExtended(t *testing.T) {
 		// Whitespace handling
 		{" 1G ", 1024 * 1024 * 1024, false},
 		{"  512M  ", 512 * 1024 * 1024, false},
-		
+
 		// Large values
 		{"16G", 16 * 1024 * 1024 * 1024, false},
 		{"1024M", 1024 * 1024 * 1024, false},
-		
+
 		// More error cases
 		{"1.2.3G", 0, true},
 		{"abc123", 0, true},
@@ -28,7 +28,7 @@ func TestParseMemoryStringExtended(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			result, err := parseMemoryString(tt.input)
-			
+
 			if tt.hasError {
 				if err == nil {
 					t.Errorf("parseMemoryString(%q) expected error, got result: %d", tt.input, result)

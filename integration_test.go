@@ -143,7 +143,7 @@ func TestDoubleVsSingleDash(t *testing.T) {
 
 	// The outputs should be identical
 	if string(singleDashOutput) != string(doubleDashOutput) {
-		t.Errorf("Single dash and double dash produced different outputs:\nSingle: %s\nDouble: %s", 
+		t.Errorf("Single dash and double dash produced different outputs:\nSingle: %s\nDouble: %s",
 			string(singleDashOutput), string(doubleDashOutput))
 	}
 }

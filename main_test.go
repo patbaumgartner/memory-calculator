@@ -15,39 +15,39 @@ func TestParseMemoryString(t *testing.T) {
 		// Bytes
 		{"Raw bytes", "2147483648", 2147483648, false},
 		{"Zero bytes", "0", 0, false},
-		
+
 		// Kilobytes
 		{"KB uppercase", "1024KB", 1024 * 1024, false},
 		{"K uppercase", "1024K", 1024 * 1024, false},
 		{"kb lowercase", "512kb", 512 * 1024, false},
 		{"k lowercase", "512k", 512 * 1024, false},
-		
+
 		// Megabytes
 		{"MB uppercase", "512MB", 512 * 1024 * 1024, false},
 		{"M uppercase", "512M", 512 * 1024 * 1024, false},
 		{"mb lowercase", "256mb", 256 * 1024 * 1024, false},
 		{"m lowercase", "256m", 256 * 1024 * 1024, false},
-		
+
 		// Gigabytes
 		{"GB uppercase", "2GB", 2 * 1024 * 1024 * 1024, false},
 		{"G uppercase", "2G", 2 * 1024 * 1024 * 1024, false},
 		{"gb lowercase", "4gb", 4 * 1024 * 1024 * 1024, false},
 		{"g lowercase", "4g", 4 * 1024 * 1024 * 1024, false},
-		
+
 		// Terabytes
 		{"TB uppercase", "1TB", 1024 * 1024 * 1024 * 1024, false},
 		{"T uppercase", "1T", 1024 * 1024 * 1024 * 1024, false},
-		
+
 		// Decimal values
 		{"Decimal GB", "1.5G", int64(1.5 * 1024 * 1024 * 1024), false},
 		{"Decimal MB", "256.5M", int64(256.5 * 1024 * 1024), false},
 		{"Decimal KB", "1024.25K", int64(1024.25 * 1024), false},
-		
+
 		// Whitespace handling
 		{"Leading space", " 1G", 1024 * 1024 * 1024, false},
 		{"Trailing space", "1G ", 1024 * 1024 * 1024, false},
 		{"Both spaces", " 1G ", 1024 * 1024 * 1024, false},
-		
+
 		// Error cases
 		{"Empty string", "", 0, true},
 		{"Invalid unit", "1X", 0, true},
@@ -59,7 +59,7 @@ func TestParseMemoryString(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := parseMemoryString(tt.input)
-			
+
 			if tt.hasError {
 				if err == nil {
 					t.Errorf("Expected error for input %q, but got none", tt.input)
@@ -112,7 +112,7 @@ func TestDetectContainerMemory(t *testing.T) {
 				t.Errorf("detectContainerMemory() panicked: %v", r)
 			}
 		}()
-		
+
 		memory := detectContainerMemory()
 		if memory < 0 {
 			t.Errorf("detectContainerMemory() returned negative value: %d", memory)
@@ -123,7 +123,7 @@ func TestDetectContainerMemory(t *testing.T) {
 // Benchmark tests
 func BenchmarkParseMemoryString(b *testing.B) {
 	testCases := []string{"1G", "512M", "1024K", "2147483648"}
-	
+
 	for _, tc := range testCases {
 		b.Run(tc, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
@@ -140,7 +140,7 @@ func BenchmarkFormatMemory(b *testing.B) {
 		1024 * 1024 * 1024,
 		2 * 1024 * 1024 * 1024,
 	}
-	
+
 	for _, tc := range testCases {
 		b.Run("", func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
@@ -157,7 +157,7 @@ func TestEnvironmentVariables(t *testing.T) {
 	originalClassCount := os.Getenv("BPL_JVM_LOADED_CLASS_COUNT")
 	originalHeadRoom := os.Getenv("BPL_JVM_HEAD_ROOM")
 	originalTotalMemory := os.Getenv("BPL_JVM_TOTAL_MEMORY")
-	
+
 	// Clean up after test
 	defer func() {
 		os.Setenv("BPL_JVM_THREAD_COUNT", originalThreadCount)
@@ -165,14 +165,14 @@ func TestEnvironmentVariables(t *testing.T) {
 		os.Setenv("BPL_JVM_HEAD_ROOM", originalHeadRoom)
 		os.Setenv("BPL_JVM_TOTAL_MEMORY", originalTotalMemory)
 	}()
-	
+
 	tests := []struct {
-		name         string
-		threadCount  string
-		classCount   string
-		headRoom     string
-		totalMemory  int64
-		expectError  bool
+		name        string
+		threadCount string
+		classCount  string
+		headRoom    string
+		totalMemory int64
+		expectError bool
 	}{
 		{
 			name:        "Valid configuration",
@@ -199,7 +199,7 @@ func TestEnvironmentVariables(t *testing.T) {
 			expectError: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variables
@@ -209,7 +209,7 @@ func TestEnvironmentVariables(t *testing.T) {
 			if tt.totalMemory > 0 {
 				os.Setenv("BPL_JVM_TOTAL_MEMORY", string(rune(tt.totalMemory)))
 			}
-			
+
 			// Verify environment variables are set correctly
 			if os.Getenv("BPL_JVM_THREAD_COUNT") != tt.threadCount {
 				t.Errorf("BPL_JVM_THREAD_COUNT not set correctly")

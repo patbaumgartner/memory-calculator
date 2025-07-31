@@ -8,23 +8,23 @@ import (
 func TestDisplayResults(t *testing.T) {
 	// Capture output by creating a buffer-like approach
 	// Since displayResults prints to stdout, we'll test its components
-	
+
 	testProps := map[string]string{
-		"-Xmx":                           "512M",
-		"-Xss":                           "1M",
-		"-XX:MaxMetaspaceSize":           "128M",
-		"-XX:ReservedCodeCacheSize":      "240M",
-		"-XX:MaxDirectMemorySize":        "10M",
-		"JAVA_TOOL_OPTIONS":              "-Xmx512M -Xss1M -XX:MaxMetaspaceSize=128M",
+		"-Xmx":                      "512M",
+		"-Xss":                      "1M",
+		"-XX:MaxMetaspaceSize":      "128M",
+		"-XX:ReservedCodeCacheSize": "240M",
+		"-XX:MaxDirectMemorySize":   "10M",
+		"JAVA_TOOL_OPTIONS":         "-Xmx512M -Xss1M -XX:MaxMetaspaceSize=128M",
 	}
-	
+
 	// Test that displayResults doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("displayResults panicked: %v", r)
 		}
 	}()
-	
+
 	displayResults(testProps, 2*1024*1024*1024, "250", "35000", "10")
 }
 
@@ -36,28 +36,28 @@ func TestDisplayResultsWithoutJavaToolOptions(t *testing.T) {
 		"-XX:MaxMetaspaceSize":      "128M",
 		"-XX:ReservedCodeCacheSize": "240M",
 	}
-	
+
 	// Test that displayResults doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("displayResults panicked: %v", r)
 		}
 	}()
-	
+
 	displayResults(testProps, 1024*1024*1024, "300", "40000", "5")
 }
 
 func TestDisplayResultsEmpty(t *testing.T) {
 	// Test with empty props
 	testProps := map[string]string{}
-	
+
 	// Test that displayResults doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("displayResults panicked: %v", r)
 		}
 	}()
-	
+
 	displayResults(testProps, 0, "250", "35000", "0")
 }
 
@@ -66,14 +66,14 @@ func TestDisplayQuietResults(t *testing.T) {
 	testProps := map[string]string{
 		"JAVA_TOOL_OPTIONS": "-Xmx512M -Xss1M -XX:MaxMetaspaceSize=128M",
 	}
-	
+
 	// Test that displayQuietResults doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("displayQuietResults panicked: %v", r)
 		}
 	}()
-	
+
 	displayQuietResults(testProps)
 }
 
@@ -85,34 +85,34 @@ func TestDisplayQuietResultsWithoutJavaToolOptions(t *testing.T) {
 		"-XX:MaxMetaspaceSize":      "128M",
 		"-XX:ReservedCodeCacheSize": "240M",
 	}
-	
+
 	// Test that displayQuietResults doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("displayQuietResults panicked: %v", r)
 		}
 	}()
-	
+
 	displayQuietResults(testProps)
 }
 
 func TestDisplayQuietResultsEmpty(t *testing.T) {
 	// Test quiet output with empty props
 	testProps := map[string]string{}
-	
+
 	// Test that displayQuietResults doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("displayQuietResults panicked: %v", r)
 		}
 	}()
-	
+
 	displayQuietResults(testProps)
 }
 
 func TestExtractJVMFlag(t *testing.T) {
 	javaToolOptions := "-XX:MaxDirectMemorySize=10M -Xmx324661K -XX:MaxMetaspaceSize=211914K -XX:ReservedCodeCacheSize=240M -Xss1M"
-	
+
 	tests := []struct {
 		flag     string
 		expected string
@@ -125,7 +125,7 @@ func TestExtractJVMFlag(t *testing.T) {
 		{"-XX:NonExistentFlag", ""},
 		{"-Xms", ""}, // Not in the string
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.flag, func(t *testing.T) {
 			result := extractJVMFlag(javaToolOptions, tt.flag)
@@ -142,14 +142,14 @@ func TestDisplayJVMSetting(t *testing.T) {
 		"-Xmx": "512M",
 		"-Xss": "1M",
 	}
-	
+
 	// Test that displayJVMSetting doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("displayJVMSetting panicked: %v", r)
 		}
 	}()
-	
+
 	displayJVMSetting(testProps, "-Xmx", "Max Heap Size: ")
 	displayJVMSetting(testProps, "-Xss", "Thread Stack Size: ")
 	displayJVMSetting(testProps, "-XX:NonExistent", "Non Existent: ")
@@ -160,14 +160,14 @@ func TestDisplayJVMSettingFromJavaToolOptions(t *testing.T) {
 	testProps := map[string]string{
 		"JAVA_TOOL_OPTIONS": "-XX:MaxDirectMemorySize=10M -Xmx324661K -XX:MaxMetaspaceSize=211914K -Xss1M",
 	}
-	
+
 	// Test that displayJVMSetting doesn't panic
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("displayJVMSetting panicked: %v", r)
 		}
 	}()
-	
+
 	displayJVMSetting(testProps, "-Xmx", "Max Heap Size: ")
 	displayJVMSetting(testProps, "-XX:MaxMetaspaceSize", "Max Metaspace Size: ")
 	displayJVMSetting(testProps, "-XX:NonExistent", "Non Existent: ")
@@ -180,7 +180,7 @@ func TestStringRepeat(t *testing.T) {
 	if result != expected {
 		t.Errorf("strings.Repeat('=', 50) = %q, expected %q", result, expected)
 	}
-	
+
 	result = strings.Repeat("-", 30)
 	expected = "------------------------------"
 	if result != expected {
@@ -191,12 +191,12 @@ func TestStringRepeat(t *testing.T) {
 // Test edge cases for memory calculation inputs
 func TestMemoryCalculationInputs(t *testing.T) {
 	tests := []struct {
-		name         string
-		memory       int64
-		threadCount  string
-		classCount   string
-		headRoom     string
-		shouldPass   bool
+		name        string
+		memory      int64
+		threadCount string
+		classCount  string
+		headRoom    string
+		shouldPass  bool
 	}{
 		{
 			name:        "Normal case",
@@ -231,7 +231,7 @@ func TestMemoryCalculationInputs(t *testing.T) {
 			shouldPass:  true,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer func() {
@@ -239,7 +239,7 @@ func TestMemoryCalculationInputs(t *testing.T) {
 					t.Errorf("Test %s panicked when it should pass: %v", tt.name, r)
 				}
 			}()
-			
+
 			// Test formatMemory with various inputs
 			result := formatMemory(tt.memory)
 			if tt.memory <= 0 && result != "Unknown" {
@@ -269,7 +269,7 @@ func TestMemoryFormatEdgeCases(t *testing.T) {
 		{1536 * 1024 * 1024, "1.50 GB"},
 		{2560 * 1024 * 1024, "2.50 GB"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.expected, func(t *testing.T) {
 			result := formatMemory(tt.bytes)
