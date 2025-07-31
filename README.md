@@ -1,5 +1,12 @@
 # JVM Memory Calculator
 
+[![Build Status](https://github.com/patbaumgartner/memory-calculator/actions/workflows/build.yml/badge.svg)](https://github.com/patbaumgartner/memory-calculator/actions/workflows/build.yml)
+[![Coverage](https://codecov.io/gh/patbaumgartner/memory-calculator/branch/main/graph/badge.svg)](https://codecov.io/gh/patbaumgartner/memory-calculator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/patbaumgartner/memory-calculator)](https://goreportcard.com/report/github.com/patbaumgartner/memory-calculator)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/patbaumgartner/memory-calculator)](https://github.com/patbaumgartner/memory-calculator/releases/latest)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/patbaumgartner/memory-calculator)](https://go.dev/)
+[![License](https://img.shields.io/github/license/patbaumgartner/memory-calculator)](LICENSE)
+
 A comprehensive JVM memory calculator compatible with Paketo buildpacks (Temurin, Liberica) that automatically detects container memory limits and calculates optimal JVM memory settings.
 
 ## Features
