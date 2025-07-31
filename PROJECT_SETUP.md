@@ -5,25 +5,43 @@ This document summarizes the complete project setup for the JVM Memory Calculato
 ## 📁 Project Structure
 
 ```
+```
 memory-calculator/
-├── .github/
-│   └── workflows/
-│       └── build.yml           # GitHub Actions CI/CD pipeline
-├── coverage/                   # Test coverage reports (generated)
-├── dist/                      # Build artifacts (generated)
-├── .gitignore                 # Git ignore patterns
-├── .vscode/                   # VS Code settings (optional)
-├── CONTRIBUTING.md            # Contribution guidelines
-├── Dockerfile                 # Container build instructions
-├── LICENSE                    # MIT License
-├── Makefile                   # Build automation
-├── README.md                  # Main project documentation
-├── TEST_DOCUMENTATION.md      # Test documentation
-├── go.mod                     # Go module definition
-├── go.sum                     # Go module checksums
-├── main.go                    # Main application code
-├── *_test.go                  # Test files
-└── memory-calculator          # Built binary (generated)
+├── .github/                   # GitHub-specific configuration
+│   ├── ISSUE_TEMPLATE/       # Issue templates
+│   │   ├── bug_report.yml    # Bug report template
+│   │   ├── feature_request.yml # Feature request template
+│   │   └── question.yml      # Question template
+│   ├── workflows/
+│   │   └── build.yml         # GitHub Actions CI/CD pipeline
+│   ├── dependabot.yml        # Dependabot configuration
+│   └── pull_request_template.md # PR template
+├── cmd/                      # Application entry points
+│   └── memory-calculator/
+│       └── main.go           # Main application entry point
+├── internal/                 # Private application packages
+│   ├── cgroups/             # Container memory detection
+│   ├── config/              # Configuration management
+│   ├── display/             # Output formatting
+│   ├── host/                # Host memory detection
+│   └── memory/              # Memory parsing logic
+├── pkg/                     # Public packages
+│   └── errors/              # Structured error handling
+├── coverage/                # Test coverage reports (generated)
+├── dist/                   # Build artifacts (generated)
+├── .gitignore              # Git ignore patterns
+├── .vscode/                # VS Code settings (optional)
+├── CONTRIBUTING.md         # Contribution guidelines
+├── Dockerfile              # Container build instructions
+├── LICENSE                 # MIT License
+├── Makefile                # Build automation
+├── README.md               # Main project documentation
+├── TEST_DOCUMENTATION.md   # Test documentation
+├── go.mod                  # Go module definition
+├── go.sum                  # Go module checksums
+├── *_test.go               # Test files
+└── memory-calculator       # Built binary (generated)
+```
 ```
 
 ## 🛠️ Development Tools
@@ -32,18 +50,49 @@ memory-calculator/
 - `make build` - Build for current platform
 - `make build-all` - Build for all supported platforms
 - `make test` - Run all tests
-- `make test-coverage` - Run tests with coverage
+- `make coverage` - Run tests with coverage
 - `make coverage-html` - Generate HTML coverage report
+- `make quality` - Run comprehensive quality checks (format, lint, security, vulnerabilities)
+- `make tools` - Install all development tools
+- `make tools-check` - Check if all tools are available
 - `make clean` - Clean build artifacts
 - `make help` - Show all available commands
 
 ### GitHub Actions
-Automated CI/CD pipeline that:
-- Runs tests on every push/PR
-- Builds binaries for multiple platforms
-- Creates releases with downloadable artifacts
-- Generates test coverage reports
-- Builds Docker images
+Comprehensive CI/CD pipeline that automatically:
+
+**On Every Push/PR:**
+- ✅ **Tests**: Runs complete test suite with race detection
+- ✅ **Coverage**: Generates coverage reports (uploads to Codecov)
+- ✅ **Quality**: Runs golangci-lint with custom configuration
+- ✅ **Security**: Performs gosec security scanning
+- ✅ **Vulnerabilities**: Checks for known vulnerabilities with govulncheck
+- ✅ **Cross-Platform Builds**: Builds for all supported platforms
+
+**On Git Tags (v*):**
+- 🚀 **Automated Releases**: Creates GitHub releases with binaries
+- 📦 **Multi-Platform Artifacts**: Builds and uploads platform-specific binaries
+- 🔐 **Checksums**: Generates SHA256 checksums for all artifacts
+- 📝 **Release Notes**: Auto-generates release notes from commits
+
+**Docker Support:**
+- 🐳 **Multi-Arch Images**: Builds for linux/amd64 and linux/arm64
+- 🏷️ **Smart Tagging**: Version tags, latest tag, and branch tags
+- 📤 **Registry Push**: Pushes to Docker Hub (when configured)
+
+**Dependency Management:**
+- 🔄 **Dependabot**: Weekly automated dependency updates
+- 📋 **Go Modules**: Automatic Go dependency updates
+- ⚙️ **GitHub Actions**: Keeps workflow actions up-to-date
+- 🐳 **Docker**: Updates base Docker images
+
+### GitHub Issue & PR Templates
+Structured templates for better collaboration:
+
+- **Bug Reports**: YAML-based form with environment details
+- **Feature Requests**: Structured feature proposal template
+- **Questions**: Template for asking questions and getting help
+- **Pull Requests**: Comprehensive PR checklist and guidelines
 
 ### Supported Platforms
 - **Linux**: amd64, arm64
@@ -86,7 +135,7 @@ docker run --rm memory-calculator --help
 
 ## 🧪 Testing Framework
 
-### Test Coverage: 75.2%
+### Test Coverage: 77.1%
 The codebase has been refactored with a professional package structure providing excellent test coverage:
 
 - **Unit Tests**: Per-package testing with dependency injection
@@ -121,24 +170,72 @@ All transitive dependencies managed automatically by Go modules.
 
 ## 🚀 Release Process
 
-### Automated Releases
-1. Create and push a git tag: `git tag v1.0.0 && git push origin v1.0.0`
-2. GitHub Actions automatically:
-   - Builds binaries for all platforms
-   - Creates GitHub release
-   - Uploads downloadable artifacts
-   - Generates checksums
+### Automated Releases (Recommended)
+The project uses **fully automated releases** triggered by Git tags:
 
-### Manual Release
+```bash
+# 1. Ensure everything is committed and pushed
+git add -A
+git commit -m "feat: prepare for v1.2.0 release"
+git push origin main
+
+# 2. Create and push a version tag
+git tag v1.2.0
+git push origin v1.2.0
+
+# 3. GitHub Actions automatically:
+#    - Runs full test suite
+#    - Builds binaries for all platforms (Linux/macOS, amd64/arm64)
+#    - Creates GitHub release with auto-generated notes
+#    - Uploads all artifacts with checksums
+#    - Builds and pushes Docker images
+```
+
+### Release Artifacts Generated
+For each release, the following artifacts are automatically created:
+
+- `memory-calculator-linux-amd64` - Linux x86_64 binary
+- `memory-calculator-linux-arm64` - Linux ARM64 binary  
+- `memory-calculator-darwin-amd64` - macOS Intel binary
+- `memory-calculator-darwin-arm64` - macOS Apple Silicon binary
+- `checksums.txt` - SHA256 checksums for all binaries
+- **Docker Images**: Multi-arch images pushed to Docker Hub
+
+### Manual Release (Fallback)
+If needed, you can create releases manually:
+
 ```bash
 # Check release readiness
 make release-check
 
-# Build all platforms
+# Build all platforms locally
 make build-all
 
-# Create release manually via GitHub UI
+# Create release manually via GitHub UI or GitHub CLI
+gh release create v1.2.0 dist/* --generate-notes
 ```
+
+### Release Checklist
+Before creating a release:
+
+- [ ] All tests pass (`make test`)
+- [ ] Quality checks pass (`make quality`)
+- [ ] CHANGELOG.md updated
+- [ ] Version number updated in relevant files
+- [ ] Working directory is clean (`git status`)
+- [ ] All changes pushed to main branch
+
+### Versioning Strategy
+The project follows [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** version for incompatible API changes
+- **MINOR** version for backwards-compatible functionality
+- **PATCH** version for backwards-compatible bug fixes
+
+Examples:
+- `v1.0.0` - Major release
+- `v1.1.0` - New features, backwards compatible
+- `v1.1.1` - Bug fixes, backwards compatible
 
 ## 📋 Quality Assurance
 

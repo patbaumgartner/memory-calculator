@@ -16,7 +16,7 @@ A comprehensive JVM memory calculator compatible with Paketo buildpacks (Temurin
 - 🎛️ **Flexible Configuration**: All parameters configurable via command line
 - 📏 **Memory Units Support**: Supports B, K, KB, M, MB, G, GB, T, TB with decimal values
 - 🤫 **Quiet Mode**: Output only JVM arguments for scripting integration
-- 🧪 **Comprehensive Testing**: 75%+ test coverage with unit, integration, and benchmark tests
+- 🧪 **Comprehensive Testing**: 77.1% test coverage with unit, integration, and benchmark tests
 
 ## Quick Start
 
@@ -95,17 +95,24 @@ make build
 git clone https://github.com/patbaumgartner/memory-calculator.git
 cd memory-calculator
 
-# Install dependencies
-go mod download
+# Install dependencies and development tools
+make deps
+make tools
+
+# Verify tools are installed
+make tools-check
 
 # Run tests
-go test -v
+make test
 
-# Run with coverage
-go test -cover
+# Run tests with coverage
+make coverage
+
+# Run comprehensive quality checks
+make quality
 
 # Build for development
-go build -o memory-calculator
+make build
 ```
 
 ### Build Commands
@@ -124,10 +131,35 @@ make clean
 make test
 
 # Run tests with coverage
-make test-coverage
+make coverage
 
-# Generate coverage report
+# Generate HTML coverage report
 make coverage-html
+
+# Run benchmarks
+make benchmark
+
+# Install all development tools
+make tools
+
+# Check if all tools are available
+make tools-check
+
+# Run comprehensive quality checks (format, lint, security, vulnerabilities)
+make quality
+
+# Individual quality checks
+make format           # Format Go code
+make lint             # Run linter
+make security         # Run security checks
+make vulncheck        # Check for vulnerabilities
+
+# Development and utility
+make dev              # Run in development mode with --help
+make dev-test         # Run with test parameters
+make install          # Install binary to GOPATH/bin
+make release-check    # Check if ready for release
+make help             # Show all available targets
 ```
 
 ### Testing
@@ -136,28 +168,51 @@ The project includes comprehensive test coverage:
 
 ```bash
 # Run all tests
-go test -v
+make test
 
 # Run tests with coverage
-go test -v -cover
+make coverage
 
-# Run specific test suites
-go test -run TestMemory -v
-go test -run TestIntegration -v
-go test -run TestCgroups -v
+# Generate HTML coverage report  
+make coverage-html
 
-# Generate detailed coverage report
-go test -coverprofile=coverage.out
-go tool cover -html=coverage.out -o coverage.html
+# Run benchmarks
+make benchmark
+
+# Run benchmarks and save results
+make benchmark-compare
+
+# Individual test suites (using go test directly)
+go test ./internal/memory -v        # Memory parsing tests
+go test ./internal/cgroups -v       # Container detection tests
+go test ./internal/host -v          # Host memory detection tests
+go test ./internal/display -v       # Display formatting tests
+go test ./internal/config -v        # Configuration tests
+go test ./pkg/errors -v             # Error handling tests
+go test -run TestMain -v            # Integration tests only
 ```
 
 ### Test Coverage
 
-Current test coverage: **75.2%** (significantly improved through professional refactoring)
+Current test coverage: **77.1%** (significantly improved with host detection features)
 
+**Package Coverage Breakdown:**
+- `pkg/errors`: **100.0%** - Structured error types with context
+- `internal/config`: **100.0%** - Configuration management and validation  
+- `internal/display`: **100.0%** - Output formatting and JVM flag extraction
+- `internal/memory`: **98.2%** - Memory parsing, formatting, and validation
+- `internal/cgroups`: **95.1%** - Container memory detection with host fallback
+- `internal/host`: **79.4%** - Cross-platform host memory detection
+- `cmd/memory-calculator`: **0.0%** - Main function (tested via integration tests)
+
+**Test Categories:**
 - Unit tests for memory parsing and formatting
 - Integration tests with binary execution
-- cgroups mocking and edge case testing
+- Container detection with mock cgroups filesystems  
+- Host memory detection across Linux and macOS platforms
+- Memory detection fallback priority testing (cgroups → host)
+- Comprehensive edge case and error condition testing
+- Performance benchmarks for all core components
 - Benchmarks for performance validation
 
 ## Usage
@@ -292,7 +347,7 @@ We welcome contributions! Please follow these guidelines:
 3. Make your changes
 4. Add tests for new functionality
 5. Ensure all tests pass: `make test`
-6. Check code coverage: `make test-coverage`
+6. Check code coverage: `make coverage`
 7. Commit your changes: `git commit -m 'feat: add amazing feature'`
 8. Push to the branch: `git push origin feature/amazing-feature`
 9. Open a Pull Request
@@ -331,21 +386,50 @@ Follow conventional commit format:
 - Include usage examples
 - Update command-line help text
 
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Quick Start for Contributors
+
+1. **Fork** the repository on GitHub
+2. **Clone** your fork: `git clone https://github.com/yourusername/memory-calculator.git`
+3. **Create a branch**: `git checkout -b feature/amazing-feature`
+4. **Make changes** and add tests
+5. **Test locally**: `make test && make quality`
+6. **Submit a PR** using our pull request template
+
+### GitHub Integration
+
+- **Issues**: Use our issue templates for bugs, features, and questions
+- **Pull Requests**: Automated testing and review process
+- **Releases**: Fully automated via git tags
+- **Actions**: Comprehensive CI/CD pipeline
+
+For detailed guidelines, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Continuous Integration
 
-The project uses GitHub Actions for:
+The project uses **GitHub Actions** for comprehensive automation:
 
-- **Build Verification**: Multi-platform builds (Linux, macOS)
-- **Test Execution**: Comprehensive test suite execution
-- **Coverage Reporting**: Code coverage analysis
-- **Release Automation**: Automatic binary releases
-- **Artifact Publishing**: Downloadable binaries for each platform
+### Automated Testing (Every Push/PR)
+- ✅ **Multi-Platform Builds**: Linux & macOS (amd64/arm64)
+- ✅ **Test Suite**: Complete test suite with race detection
+- ✅ **Coverage Analysis**: Coverage reporting with Codecov integration
+- ✅ **Quality Gates**: Linting, security scanning, vulnerability checks
+- ✅ **Integration Tests**: End-to-end CLI functionality testing
 
-### Build Matrix
+### Automated Releases (Git Tags)
+- 🚀 **Binary Artifacts**: Multi-platform binaries with checksums
+- 📝 **Release Notes**: Auto-generated from commit history  
+- 🐳 **Docker Images**: Multi-arch containers pushed to registry
+- 📦 **Package Distribution**: Ready-to-use downloadable artifacts
 
-- **Operating Systems**: Linux, macOS
-- **Architectures**: amd64, arm64
-- **Go Versions**: 1.24.5+
+### Quality Assurance Pipeline
+- **golangci-lint**: Comprehensive code linting
+- **gosec**: Security vulnerability scanning
+- **govulncheck**: Known vulnerability database checking
+- **Dependabot**: Automated dependency updates
 
 ## License
 

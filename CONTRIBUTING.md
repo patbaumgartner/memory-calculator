@@ -84,7 +84,7 @@ Use descriptive branch names:
    make test
    
    # Check coverage
-   make test-coverage
+   make coverage
    ```
 
 4. Update documentation if needed
@@ -140,7 +140,7 @@ refactor: simplify memory parsing logic
 make test
 
 # Run with coverage
-make test-coverage
+make coverage
 
 # Generate HTML coverage report
 make coverage-html
@@ -238,41 +238,71 @@ func ParseMemoryString(memory string) (int64, error) {
    ```
 
 2. **Create a Pull Request** on GitHub:
-   - Use a descriptive title
-   - Reference any related issues
+   - GitHub will automatically use our pull request template
+   - Fill out all sections of the template
+   - Use a descriptive title following [Conventional Commits](https://conventionalcommits.org/)
+   - Reference any related issues using keywords (e.g., "Fixes #123")
    - Provide a clear description of changes
-   - Include testing information
+   - Include testing information and screenshots if applicable
 
-3. **Pull Request Template**:
-   ```markdown
-   ## Description
-   Brief description of the changes
+3. **Automated GitHub Actions** will run:
+   - ✅ **Test Suite**: Complete test suite with race detection
+   - ✅ **Coverage**: Coverage analysis and reporting
+   - ✅ **Linting**: golangci-lint with project configuration
+   - ✅ **Security**: gosec security scanning
+   - ✅ **Vulnerabilities**: govulncheck vulnerability scanning
+   - ✅ **Cross-Platform**: Build verification for all platforms
 
-   ## Type of Change
-   - [ ] Bug fix
-   - [ ] New feature  
-   - [ ] Documentation update
-   - [ ] Performance improvement
-   - [ ] Code refactoring
-
-   ## Testing
-   - [ ] Tests pass locally
-   - [ ] Added tests for new functionality
-   - [ ] Updated documentation
-
-   ## Checklist
-   - [ ] Code follows project style guidelines
-   - [ ] Self-review completed
-   - [ ] Comments added to complex code
-   - [ ] No breaking changes (or marked as such)
-   ```
+4. **Pull Request Template** includes:
+   - Description and type of change checkboxes
+   - Testing checklist (unit tests, integration tests, manual testing)
+   - Documentation update confirmation
+   - Breaking changes description (if applicable)
+   - Performance impact assessment
 
 ### Review Process
 
-1. **Automated Checks**: GitHub Actions will run tests and builds
-2. **Code Review**: Maintainers will review your code
-3. **Feedback**: Address any requested changes
-4. **Approval**: Once approved, your PR will be merged
+1. **Automated Checks**: All GitHub Actions must pass ✅
+   - Test suite must have 100% pass rate
+   - Coverage should not decrease significantly
+   - No linting errors or security issues
+   - All platforms must build successfully
+
+2. **Code Review**: Maintainers will review:
+   - Code quality and adherence to Go standards
+   - Test coverage for new functionality
+   - Documentation updates
+   - Breaking change compatibility
+
+3. **Feedback**: Address any requested changes:
+   - Push additional commits to your branch
+   - GitHub Actions will re-run automatically
+   - Respond to review comments
+
+4. **Approval & Merge**: Once approved:
+   - Squash and merge is preferred for clean history
+   - Commit message should follow [Conventional Commits](https://conventionalcommits.org/)
+   - PR will be automatically closed
+
+### Issue Reporting
+
+Use GitHub Issues with our templates:
+
+- **🐛 Bug Report**: Use the bug report template with:
+  - Environment details (OS, architecture, version)
+  - Steps to reproduce
+  - Expected vs actual behavior
+  - Command used and output
+
+- **✨ Feature Request**: Use the feature request template with:
+  - Clear use case description
+  - Proposed implementation approach
+  - Alternatives considered
+
+- **❓ Question**: Use the question template for:
+  - Usage questions
+  - Clarifications about behavior
+  - General support requests
 
 ## Release Process
 
@@ -284,26 +314,73 @@ We follow [Semantic Versioning](https://semver.org/):
 - Minor: New features (backward compatible)  
 - Patch: Bug fixes (backward compatible)
 
-### Release Workflow
+### Automated Release Workflow (Maintainers Only)
+
+Releases are **fully automated** using GitHub Actions:
 
 1. **Prepare Release**:
    ```bash
-   # Ensure main is up to date
+   # Ensure all changes are merged to main
    git checkout main
-   git pull upstream main
+   git pull origin main
    
-   # Check release readiness
+   # Verify everything is ready
    make release-check
+   make test
+   make quality
    ```
 
-2. **Create Release**:
-   - Create a new tag: `git tag v1.2.3`
-   - Push tag: `git push upstream v1.2.3`
-   - GitHub Actions will automatically build and create release
+2. **Create Release Tag**:
+   ```bash
+   # Create and push version tag
+   git tag v1.2.0
+   git push origin v1.2.0
+   ```
 
-3. **Post-Release**:
-   - Update documentation if needed
-   - Announce in discussions/issues if significant
+3. **Automated GitHub Actions**:
+   - ✅ Runs complete test suite
+   - ✅ Performs security and vulnerability scans
+   - ✅ Builds binaries for all platforms (Linux/macOS, amd64/arm64)
+   - ✅ Creates GitHub release with auto-generated notes
+   - ✅ Uploads all artifacts with SHA256 checksums
+   - ✅ Builds and pushes multi-arch Docker images
+   - ✅ Updates package registries
+
+4. **Release Artifacts**:
+   - `memory-calculator-linux-amd64` - Linux x86_64 binary
+   - `memory-calculator-linux-arm64` - Linux ARM64 binary
+   - `memory-calculator-darwin-amd64` - macOS Intel binary
+   - `memory-calculator-darwin-arm64` - macOS Apple Silicon binary
+   - `checksums.txt` - SHA256 checksums
+   - Docker images on Docker Hub
+
+### Pre-Release Checklist
+
+Before creating a release tag:
+
+- [ ] All PRs merged and main branch updated
+- [ ] `make test` passes
+- [ ] `make quality` passes (format, lint, security, vulnerabilities)
+- [ ] CHANGELOG.md updated with new version
+- [ ] Version numbers updated in relevant files
+- [ ] Breaking changes documented
+- [ ] Release notes prepared (or rely on auto-generation)
+
+### Emergency Releases
+
+For critical bug fixes:
+
+1. Create hotfix branch from latest release tag
+2. Apply minimal fix
+3. Create new patch version tag
+4. GitHub Actions will handle the rest
+
+### Release Communication
+
+Releases are automatically announced via:
+- GitHub Releases page with detailed notes
+- Docker Hub with updated images
+- Package registries (when configured)
 
 ## Getting Help
 
