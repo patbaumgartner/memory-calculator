@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-07-31
+
 ### Added
 - **Host Memory Detection**: Added cross-platform host memory detection as fallback when cgroups are not available
   - Linux: Reads `/proc/meminfo` for accurate system memory detection
@@ -107,5 +109,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **JVM**: Generates standard JVM memory flags compatible with all major JVM implementations
 - **Environments**: Development, staging, and production ready
 
-[Unreleased]: https://github.com/patbaumgartner/memory-calculator/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/patbaumgartner/memory-calculator/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/patbaumgartner/memory-calculator/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/patbaumgartner/memory-calculator/releases/tag/v1.0.0
