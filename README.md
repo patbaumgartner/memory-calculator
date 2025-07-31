@@ -64,7 +64,6 @@ Download the latest release from the [GitHub Releases](https://github.com/patbau
 **Supported Platforms:**
 - Linux (amd64, arm64)
 - macOS (amd64, arm64/Apple Silicon)
-- Windows support is limited due to container-specific dependencies
 
 ### Build from Source
 

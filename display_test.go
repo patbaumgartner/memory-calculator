@@ -279,22 +279,3 @@ func TestMemoryFormatEdgeCases(t *testing.T) {
 		})
 	}
 }
-
-// Benchmark the main parsing functions
-func BenchmarkDetectContainerMemory(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		detectContainerMemory()
-	}
-}
-
-func BenchmarkReadCgroupsV1(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		readCgroupsV1()
-	}
-}
-
-func BenchmarkReadCgroupsV2(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		readCgroupsV2()
-	}
-}

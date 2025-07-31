@@ -66,11 +66,46 @@ coverage-html: test-coverage ## Generate HTML coverage report
 	$(GOCMD) tool cover -html=$(COVERAGE_DIR)/coverage.out -o $(COVERAGE_DIR)/coverage.html
 	@echo "Coverage report: $(COVERAGE_DIR)/coverage.html"
 
+benchmark: ## Run benchmarks
+	@echo "Running benchmarks..."
+	$(GOTEST) -bench=. -benchmem ./...
+
+benchmark-compare: ## Run benchmarks and save results for comparison
+	@echo "Running benchmarks with comparison data..."
+	@mkdir -p $(COVERAGE_DIR)
+	$(GOTEST) -bench=. -benchmem ./... > $(COVERAGE_DIR)/benchmark.txt
+	@echo "Benchmark results saved to $(COVERAGE_DIR)/benchmark.txt"
+
 ## Dependency commands
 deps: ## Download dependencies
 	@echo "Downloading dependencies..."
 	$(GOMOD) download
 	$(GOMOD) tidy
+
+## Security commands
+security: ## Run security checks
+	@echo "Running security checks..."
+	@if command -v gosec >/dev/null 2>&1; then \
+		gosec ./...; \
+	else \
+		echo "gosec not installed. Install with: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest"; \
+	fi
+
+security-install: ## Install security tools
+	@echo "Installing security tools..."
+	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+
+vuln-check: ## Check for known vulnerabilities
+	@echo "Checking for vulnerabilities..."
+	@if command -v govulncheck >/dev/null 2>&1; then \
+		govulncheck ./...; \
+	else \
+		echo "govulncheck not installed. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+	fi
+
+vuln-install: ## Install vulnerability checker
+	@echo "Installing vulnerability checker..."
+	go install golang.org/x/vuln/cmd/govulncheck@latest
 
 ## Utility commands
 clean: ## Clean build artifacts
@@ -86,7 +121,16 @@ format: ## Format Go code
 
 lint: ## Run linter (requires golangci-lint)
 	@echo "Running linter..."
-	golangci-lint run
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run; \
+	else \
+		echo "golangci-lint not installed. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+		exit 1; \
+	fi
+
+lint-install: ## Install golangci-lint
+	@echo "Installing golangci-lint..."
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
 ## Development commands
 dev: ## Run in development mode

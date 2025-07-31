@@ -36,9 +36,26 @@ jobs:
     - name: Run tests
       run: go test -v -race -coverprofile=coverage.out ./...
 
+    - name: Run linting
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        args: --timeout=5m
+
+    - name: Run security scan
+      run: |
+        go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+        gosec ./...
+
+    - name: Check for vulnerabilities
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
       with:
+        token: ${{ secrets.CODECOV_TOKEN }}
         files: ./coverage.out
         flags: unittests
         name: codecov-umbrella
@@ -80,7 +97,7 @@ jobs:
         # Create dist directory
         mkdir -p dist
         
-        # Build binary
+        # Build with ldflags
         BINARY_NAME="memory-calculator-${{ matrix.goos }}-${{ matrix.goarch }}"
         
         # Build with ldflags

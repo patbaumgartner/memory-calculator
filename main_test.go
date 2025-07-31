@@ -120,36 +120,6 @@ func TestDetectContainerMemory(t *testing.T) {
 	})
 }
 
-// Benchmark tests
-func BenchmarkParseMemoryString(b *testing.B) {
-	testCases := []string{"1G", "512M", "1024K", "2147483648"}
-
-	for _, tc := range testCases {
-		b.Run(tc, func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				_, _ = parseMemoryString(tc)
-			}
-		})
-	}
-}
-
-func BenchmarkFormatMemory(b *testing.B) {
-	testCases := []int64{
-		1024,
-		1024 * 1024,
-		1024 * 1024 * 1024,
-		2 * 1024 * 1024 * 1024,
-	}
-
-	for _, tc := range testCases {
-		b.Run("", func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				_ = formatMemory(tc)
-			}
-		})
-	}
-}
-
 // Integration tests
 func TestEnvironmentVariables(t *testing.T) {
 	// Save original environment

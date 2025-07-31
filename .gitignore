@@ -53,10 +53,5 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Config files (if any)
-config.yaml
-config.yml
-config.json
-
 # Local test data
 testdata/temp/
