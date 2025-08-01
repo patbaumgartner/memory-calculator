@@ -24,10 +24,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mattn/go-shellwords"
 	"github.com/patbaumgartner/memory-calculator/internal/calc"
 	"github.com/patbaumgartner/memory-calculator/internal/count"
 	"github.com/patbaumgartner/memory-calculator/internal/logger"
+	"github.com/patbaumgartner/memory-calculator/internal/parser"
 )
 
 const (
@@ -198,7 +198,7 @@ func parseMemInfo(s string) (int64, error) {
 
 func (m MemoryCalculator) CountAgentClasses(opts string) (int, error) {
 	var agentClassCount, skippedAgents int
-	if p, err := shellwords.Parse(opts); err != nil {
+	if p, err := parser.ParseFlags(opts); err != nil {
 		return 0, fmt.Errorf("unable to parse $JAVA_TOOL_OPTIONS\n%w", err)
 	} else {
 		var agentPaths []string

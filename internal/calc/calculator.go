@@ -27,7 +27,7 @@ package calc
 import (
 	"fmt"
 
-	"github.com/mattn/go-shellwords"
+	"github.com/patbaumgartner/memory-calculator/internal/parser"
 )
 
 const (
@@ -208,7 +208,7 @@ func (c Calculator) Calculate(flags string) (MemoryRegions, error) {
 
 // parseAndApplyFlags parses JVM flags and applies them to memory regions
 func (c Calculator) parseAndApplyFlags(flags string, m *MemoryRegions) error {
-	p, err := shellwords.Parse(flags)
+	p, err := parser.ParseFlags(flags)
 	if err != nil {
 		return fmt.Errorf("unable to parse flags\n%w", err)
 	}
