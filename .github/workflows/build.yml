@@ -50,7 +50,7 @@ jobs:
         echo "Verifying main package exists..."
         ls -la cmd/memory-calculator/
         echo "Testing build process..."
-        go build -o test-binary ./cmd/memory-calculator
+        go build -trimpath -ldflags "-s -w" -o test-binary ./cmd/memory-calculator
         ./test-binary --version
         rm test-binary
 
@@ -66,7 +66,7 @@ jobs:
       run: |
         echo "Main tests failed, trying integration tests separately..."
         echo "Building binary first..."
-        go build -o test-binary ./cmd/memory-calculator
+        go build -trimpath -ldflags "-s -w" -o test-binary ./cmd/memory-calculator
         echo "Binary built successfully, running integration tests..."
         go test -v -race -timeout=5m ./integration_test.go
         rm -f test-binary
@@ -144,9 +144,10 @@ jobs:
         BINARY_NAME="memory-calculator-${{ matrix.goos }}-${{ matrix.goarch }}"
         
         echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}..."
-        # Build with ldflags and disabled CGO for cross-compilation
+        # Build with optimization flags for smaller binaries
         go build \
-          -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH}" \
+          -trimpath -a \
+          -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w" \
           -o "dist/${BINARY_NAME}" \
           ./cmd/memory-calculator
 
@@ -203,7 +204,8 @@ jobs:
           
           echo "Building for $GOOS/$GOARCH..."
           env GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build \
-            -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH}" \
+            -trimpath -a \
+            -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w" \
             -o "dist/${BINARY_NAME}" \
             ./cmd/memory-calculator
         done

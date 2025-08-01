@@ -24,15 +24,15 @@ type Detector struct {
 	MemInfoPath string
 }
 
-// NewDetector creates a new host memory detector with default paths.
-func NewDetector() *Detector {
+// Create creates a new host memory detector with default paths.
+func Create() *Detector {
 	return &Detector{
 		MemInfoPath: LinuxMemInfoPath,
 	}
 }
 
-// NewDetectorWithPath creates a new host memory detector with custom path (useful for testing).
-func NewDetectorWithPath(memInfoPath string) *Detector {
+// CreateWithPath creates a new host memory detector with custom path (useful for testing).
+func CreateWithPath(memInfoPath string) *Detector {
 	return &Detector{
 		MemInfoPath: memInfoPath,
 	}

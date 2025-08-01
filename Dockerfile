@@ -21,8 +21,9 @@ ARG VERSION=dev
 ARG BUILD_TIME
 ARG COMMIT_HASH
 RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -w -s" \
-    -a -installsuffix cgo \
+    -trimpath -a \
+    -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w" \
+    -installsuffix cgo \
     -o memory-calculator ./cmd/memory-calculator
 
 # Final stage

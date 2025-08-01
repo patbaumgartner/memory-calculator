@@ -1,3 +1,41 @@
+// Package main provides the memory-calculator CLI tool for calculating optimal JVM memory settings.
+//
+// The memory calculator is designed for containerized Java applications and provides automatic
+// memory detection from cgroups v1/v2 with intelligent host system fallback. It calculates
+// optimal JVM memory allocation including heap, metaspace, thread stacks, code cache, and
+// direct memory based on available system resources.
+//
+// Features:
+//   - Smart container detection (cgroups v1/v2 + host fallback)
+//   - Paketo buildpack integration (Temurin, Liberica)
+//   - Flexible memory unit support (B, K, KB, M, MB, G, GB, T, TB)
+//   - Quiet mode for scripting and automation
+//   - Comprehensive error handling and validation
+//
+// Basic usage:
+//
+//	memory-calculator --total-memory 2G --thread-count 300
+//	memory-calculator --quiet  # outputs only JVM arguments
+//
+// The calculator automatically detects available memory using this priority:
+//  1. Container cgroups v2: /sys/fs/cgroup/memory.max
+//  2. Container cgroups v1: /sys/fs/cgroup/memory/memory.limit_in_bytes
+//  3. Host system memory: platform-specific detection
+//
+// Memory allocation algorithm:
+//  1. Head room reservation (configurable percentage)
+//  2. Thread stacks (threads × 1MB each)
+//  3. Metaspace (loaded classes × 8KB each)
+//  4. Code cache (240MB for JIT compilation)
+//  5. Direct memory (10MB for NIO operations)
+//  6. Heap memory (remaining available memory)
+//
+// Environment integration:
+//   - JAVA_TOOL_OPTIONS: automatically configured with calculated JVM arguments
+//   - Paketo buildpack variables: BPL_JVM_THREAD_COUNT, BPL_JVM_HEAD_ROOM, etc.
+//   - Container orchestration: Docker, Kubernetes, Cloud Foundry
+//
+// For detailed documentation and examples, see: https://github.com/patbaumgartner/memory-calculator
 package main
 
 import (
@@ -5,11 +43,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/paketo-buildpacks/libjvm/helper"
-	"github.com/patbaumgartner/memory-calculator/internal/cgroups"
+	"github.com/patbaumgartner/memory-calculator/internal/calculator"
 	"github.com/patbaumgartner/memory-calculator/internal/config"
 	"github.com/patbaumgartner/memory-calculator/internal/display"
-	"github.com/patbaumgartner/memory-calculator/internal/memory"
 	"github.com/patbaumgartner/memory-calculator/pkg/errors"
 )
 
@@ -21,7 +57,7 @@ var (
 )
 
 func main() {
-	cfg := config.DefaultConfig()
+	cfg := config.Load()
 	cfg.BuildVersion = version
 	cfg.BuildTime = buildTime
 	cfg.CommitHash = commitHash
@@ -37,7 +73,7 @@ func main() {
 
 	flag.Parse()
 
-	formatter := display.NewFormatter()
+	formatter := display.CreateFormatter()
 
 	if cfg.Version {
 		formatter.DisplayVersion(cfg)
@@ -57,63 +93,52 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize components
-	memoryParser := memory.NewParser()
-	cgroupsDetector := cgroups.NewDetector()
-
-	// Detect container memory from cgroups with host fallback
-	containerMemory := cgroupsDetector.DetectContainerMemory()
-
-	// Determine final memory to use
-	var finalMemory int64
-	if cfg.TotalMemory != "" {
-		parsed, err := memoryParser.ParseMemoryString(cfg.TotalMemory)
-		if err != nil {
-			if !cfg.Quiet {
-				if mcErr, ok := err.(*errors.MemoryCalculatorError); ok {
-					log.Printf("Invalid total-memory value: %v, using detected memory", mcErr)
-				} else {
-					log.Printf("Invalid total-memory value: %v, using detected memory", err)
-				}
-			}
-			finalMemory = containerMemory
-		} else {
-			finalMemory = parsed
-			if !cfg.Quiet {
-				log.Printf("Using specified memory: %s", memoryParser.FormatMemory(finalMemory))
-			}
-		}
-	} else {
-		finalMemory = containerMemory
-	}
-
-	if !cfg.Quiet {
-		if finalMemory > 0 {
-			log.Printf("Memory detected: %s", memoryParser.FormatMemory(finalMemory))
-		} else {
-			log.Println("No memory limit detected from cgroups or host, using system defaults")
-		}
-	}
-
 	// Set environment variables for memory calculator
 	cfg.SetEnvironmentVariables()
-	cfg.SetTotalMemory(finalMemory)
+
+	// Set total memory if specified
+	if cfg.TotalMemory != "" {
+		_ = os.Setenv("BPL_JVM_TOTAL_MEMORY", cfg.TotalMemory)
+	}
+
+	// Set required default environment variables if not already set
+	setDefaultEnvironmentVariables()
 
 	// Execute memory calculator
-	mc := helper.MemoryCalculator{}
+	mc := calculator.Create(cfg.Quiet)
 	props, err := mc.Execute()
 	if err != nil {
-		mcErr := errors.NewCalculationError("Memory calculation failed", err)
-		if !cfg.Quiet {
-			log.Printf("Error: %v", mcErr)
-		}
-		os.Exit(1)
+		handleError(cfg.Quiet, "Memory calculation failed", err)
 	}
 
 	// Display results
+	displayResults(formatter, props, cfg)
+}
+
+// setDefaultEnvironmentVariables sets required default environment variables if not already set
+func setDefaultEnvironmentVariables() {
+	if os.Getenv("BPI_APPLICATION_PATH") == "" {
+		_ = os.Setenv("BPI_APPLICATION_PATH", "/app")
+	}
+	if os.Getenv("BPI_JVM_CLASS_COUNT") == "" {
+		_ = os.Setenv("BPI_JVM_CLASS_COUNT", "1000")
+	}
+}
+
+// handleError handles and logs errors consistently
+func handleError(quiet bool, message string, err error) {
+	mcErr := errors.NewCalculationError(message, err)
+	if !quiet {
+		log.Printf("Error: %v", mcErr)
+	}
+	os.Exit(1)
+}
+
+// displayResults displays the calculation results based on quiet flag
+func displayResults(formatter *display.Formatter, props map[string]string, cfg *config.Config) {
 	if cfg.Quiet {
 		formatter.DisplayQuietResults(props)
 	} else {
-		formatter.DisplayResults(props, finalMemory, cfg)
+		formatter.DisplayResults(props, 0, cfg) // Let formatter get memory from props
 	}
 }

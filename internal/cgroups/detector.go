@@ -27,26 +27,26 @@ type Detector struct {
 	HostDetector *host.Detector
 }
 
-// NewDetector creates a new cgroups detector with default paths and host fallback.
-func NewDetector() *Detector {
+// Create creates a new cgroups detector with default paths and host fallback.
+func Create() *Detector {
 	return &Detector{
 		CgroupsV2Path: "/sys/fs/cgroup/memory.max",
 		CgroupsV1Path: "/sys/fs/cgroup/memory/memory.limit_in_bytes",
-		HostDetector:  host.NewDetector(),
+		HostDetector:  host.Create(),
 	}
 }
 
-// NewDetectorWithPaths creates a new cgroups detector with custom paths (useful for testing).
-func NewDetectorWithPaths(v2Path, v1Path string) *Detector {
+// CreateWithPaths creates a new cgroups detector with custom paths (useful for testing).
+func CreateWithPaths(v2Path, v1Path string) *Detector {
 	return &Detector{
 		CgroupsV2Path: v2Path,
 		CgroupsV1Path: v1Path,
-		HostDetector:  host.NewDetector(),
+		HostDetector:  host.Create(),
 	}
 }
 
-// NewDetectorWithPathsAndHost creates a new cgroups detector with custom paths and host detector (useful for testing).
-func NewDetectorWithPathsAndHost(v2Path, v1Path string, hostDetector *host.Detector) *Detector {
+// CreateWithPathsAndHost creates a new cgroups detector with custom paths and host detector (useful for testing).
+func CreateWithPathsAndHost(v2Path, v1Path string, hostDetector *host.Detector) *Detector {
 	return &Detector{
 		CgroupsV2Path: v2Path,
 		CgroupsV1Path: v1Path,

@@ -1,6 +1,6 @@
 # Project Setup Summary
 
-This document summarizes the complete project setup for the JVM Memory Calculator.
+This document summarizes the complete project setup for the JVM Memory Calculator with **build constraint support** for optimized deployment scenarios.
 
 ## 📁 Project Structure
 
@@ -20,10 +20,21 @@ memory-calculator/
 │   └── memory-calculator/
 │       └── main.go           # Main application entry point
 ├── internal/                 # Private application packages
+│   ├── calc/                # Core calculation with build variants
+│   │   ├── calc_standard.go # Standard build implementation
+│   │   ├── calc_minimal.go  # Minimal build implementation
+│   │   └── build_constraints_test.go # Build constraint tests
+│   ├── calculator/          # Calculator orchestration
 │   ├── cgroups/             # Container memory detection
 │   ├── config/              # Configuration management
+│   ├── constants/           # Application constants
+│   ├── count/               # Class counting with build variants
+│   │   ├── count.go         # Standard implementation
+│   │   ├── count_minimal.go # Minimal implementation (size-based)
+│   │   └── minimal_build_test.go # Minimal build tests
 │   ├── display/             # Output formatting
 │   ├── host/                # Host memory detection
+│   ├── logger/              # Logging utilities
 │   └── memory/              # Memory parsing logic
 ├── pkg/                     # Public packages
 │   └── errors/              # Structured error handling
@@ -47,9 +58,13 @@ memory-calculator/
 ## 🛠️ Development Tools
 
 ### Makefile Commands
-- `make build` - Build for current platform
-- `make build-all` - Build for all supported platforms
-- `make test` - Run all tests
+- `make build` - Build standard variant for current platform
+- `make build-minimal` - Build minimal variant (37% smaller)
+- `make build-all` - Build both variants for all supported platforms
+- `make build-compressed` - Build ultra-compressed binary (requires UPX)
+- `make build-size-comparison` - Compare optimized vs unoptimized binary sizes
+- `make test` - Run all tests (including build constraint tests)
+- `make test-variants` - Test both build variants explicitly
 - `make coverage` - Run tests with coverage
 - `make coverage-html` - Generate HTML coverage report
 - `make quality` - Run comprehensive quality checks (format, lint, security, vulnerabilities)
@@ -57,6 +72,73 @@ memory-calculator/
 - `make tools-check` - Check if all tools are available
 - `make clean` - Clean build artifacts
 - `make help` - Show all available commands
+
+### Build Variants
+
+The project supports **two optimized build variants**:
+
+#### Standard Build
+```bash
+make build
+# OR
+go build ./cmd/memory-calculator
+```
+- **Full features**: Complete regex-based parsing
+- **Size**: ~2.4MB (30% optimized from 3.5MB original)
+- **Dependencies**: All features included
+
+#### Minimal Build
+```bash
+make build-minimal
+# OR
+go build -tags minimal ./cmd/memory-calculator
+```
+- **Size optimized**: String-based parsing
+- **Size**: ~2.2MB (37% optimized from 3.5MB original)
+- **Dependencies**: Reduced set, eliminates archive/zip
+
+### Binary Size Optimization
+
+The project uses **aggressive optimization flags** and **build constraints** to produce smaller binaries:
+
+#### Optimization Techniques Used:
+
+1. **Build Constraints**: Conditional compilation with `//go:build` tags
+2. **Strip Debug Information**: `-ldflags="-s -w"`
+   - `-s`: Removes symbol table and debug info
+   - `-w`: Removes DWARF debug information
+
+2. **Reproducible Builds**: `-trimpath`
+   - Removes file system paths from the executable
+   - Ensures consistent builds across environments
+
+3. **Force Clean Rebuilds**: `-a`
+   - Forces rebuilding of all packages
+   - Ensures optimal linking
+
+#### Size Comparison:
+```bash
+make build-size-comparison
+# Output example:
+# Unoptimized: 3.5M
+# Optimized:   2.4M  
+# Savings:     30.0%
+```
+
+#### Ultra Compression (Optional):
+For even smaller binaries, install UPX and use:
+```bash
+# Ubuntu/Debian
+sudo apt install upx-ucl
+
+# macOS  
+brew install upx
+
+# Build with UPX compression
+make build-compressed
+```
+
+**Note**: UPX compression trades startup time for smaller file size.
 
 ### GitHub Actions
 Comprehensive CI/CD pipeline that automatically:

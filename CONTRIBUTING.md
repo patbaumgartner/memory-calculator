@@ -131,23 +131,40 @@ refactor: simplify memory parsing logic
 
 - **Unit Tests**: Test individual functions and components
 - **Integration Tests**: Test the full binary with various inputs
+- **Build Constraint Tests**: Test both standard and minimal build variants
+- **Cross-Build Tests**: Ensure consistency across build variants
 - **Benchmark Tests**: Performance testing for critical paths
+
+### Build Variants
+
+The project supports multiple build variants:
+
+```bash
+# Standard build (full features)
+go build ./cmd/memory-calculator
+
+# Minimal build (size optimized)
+go build -tags minimal ./cmd/memory-calculator
+
+# Test both variants
+make test-variants
+```
 
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (including build constraints)
 make test
 
 # Run with coverage
 make coverage
 
-# Generate HTML coverage report
-make coverage-html
+# Test both build variants
+bash .github/workflows/test-local.sh
 
 # Run specific test files
-go test -v ./memory_test.go
-go test -run TestMemoryParsing -v
+go test -v ./internal/calc/build_constraints_test.go
+go test -tags minimal -v ./internal/count/minimal_build_test.go
 ```
 
 ### Writing Tests

@@ -14,10 +14,10 @@ type Formatter struct {
 	parser *memory.Parser
 }
 
-// NewFormatter creates a new display formatter.
-func NewFormatter() *Formatter {
+// CreateFormatter creates a new display formatter.
+func CreateFormatter() *Formatter {
 	return &Formatter{
-		parser: memory.NewParser(),
+		parser: memory.CreateParser(),
 	}
 }
 
@@ -79,7 +79,7 @@ func (f *Formatter) DisplayHelp(cfg *config.Config) {
 	fmt.Println("Flags:")
 	fmt.Println("  --total-memory string         Total memory (e.g., 2G, 512M, 1024MB)")
 	fmt.Println("  --thread-count string         JVM thread count (default \"250\")")
-	fmt.Println("  --loaded-class-count string   JVM loaded class count (default \"35000\")")
+	fmt.Println("  --loaded-class-count string   JVM loaded class count (calculated if not set)")
 	fmt.Println("  --head-room string            JVM head room percentage (default \"0\")")
 	fmt.Println("  --quiet                       Only output JVM parameters, no formatting")
 	fmt.Println("  --version                     Show version information")

@@ -10,19 +10,19 @@ import (
 	"github.com/patbaumgartner/memory-calculator/internal/config"
 )
 
-func TestNewFormatter(t *testing.T) {
-	formatter := NewFormatter()
+func TestCreateFormatter(t *testing.T) {
+	formatter := CreateFormatter()
 	if formatter == nil {
-		t.Error("NewFormatter() returned nil")
+		t.Error("CreateFormatter() returned nil")
 		return
 	}
 	if formatter.parser == nil {
-		t.Error("NewFormatter() did not initialize parser")
+		t.Error("CreateFormatter() did not initialize parser")
 	}
 }
 
 func TestDisplayVersion(t *testing.T) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 	cfg := &config.Config{
 		BuildVersion: "1.0.0",
 		BuildTime:    "2023-01-01_12:00:00",
@@ -59,7 +59,7 @@ func TestDisplayVersion(t *testing.T) {
 }
 
 func TestDisplayHelp(t *testing.T) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 	cfg := &config.Config{
 		BuildVersion: "1.0.0",
 	}
@@ -97,7 +97,7 @@ func TestDisplayHelp(t *testing.T) {
 }
 
 func TestDisplayResults(t *testing.T) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 	cfg := &config.Config{
 		ThreadCount:      "250",
 		LoadedClassCount: "35000",
@@ -143,7 +143,7 @@ func TestDisplayResults(t *testing.T) {
 }
 
 func TestDisplayResultsWithIndividualProps(t *testing.T) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 	cfg := &config.Config{
 		ThreadCount:      "250",
 		LoadedClassCount: "35000",
@@ -190,7 +190,7 @@ func TestDisplayResultsWithIndividualProps(t *testing.T) {
 }
 
 func TestDisplayQuietResults(t *testing.T) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 
 	tests := []struct {
 		name     string
@@ -250,7 +250,7 @@ func TestDisplayQuietResults(t *testing.T) {
 }
 
 func TestExtractJVMFlag(t *testing.T) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 
 	tests := []struct {
 		name            string
@@ -301,7 +301,7 @@ func TestExtractJVMFlag(t *testing.T) {
 }
 
 func TestBuildJavaToolOptions(t *testing.T) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 
 	tests := []struct {
 		name     string
@@ -349,7 +349,7 @@ func TestBuildJavaToolOptions(t *testing.T) {
 }
 
 func TestDisplayJVMSetting(t *testing.T) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 
 	tests := []struct {
 		name     string
@@ -412,7 +412,7 @@ func TestDisplayJVMSetting(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkDisplayResults(b *testing.B) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 	cfg := &config.Config{
 		ThreadCount:      "250",
 		LoadedClassCount: "35000",
@@ -437,7 +437,7 @@ func BenchmarkDisplayResults(b *testing.B) {
 }
 
 func BenchmarkExtractJVMFlag(b *testing.B) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 	javaToolOptions := "-Xmx1024M -Xss1M -XX:MaxMetaspaceSize=256M -XX:ReservedCodeCacheSize=128M"
 	flag := "-Xmx"
 
@@ -448,7 +448,7 @@ func BenchmarkExtractJVMFlag(b *testing.B) {
 }
 
 func TestEdgeCases(t *testing.T) {
-	formatter := NewFormatter()
+	formatter := CreateFormatter()
 
 	t.Run("Nil config", func(t *testing.T) {
 		// This should not panic

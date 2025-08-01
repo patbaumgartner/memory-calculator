@@ -48,13 +48,40 @@ go mod download
 
 echo ""
 echo "🧪 Running tests with race detection..."
-go test -v -race -timeout=10m -coverprofile=coverage.out ./...
+# Set up test environment with a mock application directory
+mkdir -p testdata/app
+echo "mock.jar" > testdata/app/mock.jar
+
+# Run tests with proper environment
+BPI_APPLICATION_PATH=$(pwd)/testdata/app go test -v -race -timeout=10m -coverprofile=coverage.out ./...
 
 echo ""
 echo "📊 Generate coverage report..."
 go tool cover -func=coverage.out
 echo "Coverage Summary:"
 go tool cover -func=coverage.out | tail -1
+
+echo ""
+echo "🔧 Testing both build variants..."
+echo "Building standard variant..."
+go build -o memory-calculator-test-standard ./cmd/memory-calculator
+echo "Building minimal variant..."
+go build -tags minimal -o memory-calculator-test-minimal ./cmd/memory-calculator
+
+echo ""
+echo "Testing standard build variant:"
+BPI_APPLICATION_PATH=$(pwd)/testdata/app ./memory-calculator-test-standard --total-memory 1G --thread-count 50 --quiet
+
+echo ""
+echo "Testing minimal build variant:"
+BPI_APPLICATION_PATH=$(pwd)/testdata/app ./memory-calculator-test-minimal --total-memory 1G --thread-count 50 --quiet
+
+echo ""
+echo "Comparing binary sizes:"
+ls -lh memory-calculator-test-* | awk '{print $5 "\t" $9}'
+
+# Clean up test binaries
+rm -f memory-calculator-test-standard memory-calculator-test-minimal
 
 echo ""
 echo "✅ All steps completed successfully!"

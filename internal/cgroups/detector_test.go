@@ -9,57 +9,73 @@ import (
 	"github.com/patbaumgartner/memory-calculator/pkg/errors"
 )
 
-func TestNewDetector(t *testing.T) {
-	detector := NewDetector()
+func TestCreateDetector(t *testing.T) {
+	detector := Create()
+
+	if detector == nil {
+		t.Error("Expected non-nil detector")
+		return
+	}
 
 	if detector.CgroupsV2Path != "/sys/fs/cgroup/memory.max" {
-		t.Errorf("Expected CgroupsV2Path='/sys/fs/cgroup/memory.max', got %s", detector.CgroupsV2Path)
+		t.Errorf("Expected v2 path '/sys/fs/cgroup/memory.max', got '%s'", detector.CgroupsV2Path)
 	}
 
 	if detector.CgroupsV1Path != "/sys/fs/cgroup/memory/memory.limit_in_bytes" {
-		t.Errorf("Expected CgroupsV1Path='/sys/fs/cgroup/memory/memory.limit_in_bytes', got %s", detector.CgroupsV1Path)
+		t.Errorf("Expected v1 path '/sys/fs/cgroup/memory/memory.limit_in_bytes', got '%s'", detector.CgroupsV1Path)
 	}
 
 	if detector.HostDetector == nil {
-		t.Error("Expected HostDetector to be initialized, got nil")
+		t.Error("Expected non-nil host detector")
 	}
 }
 
-func TestNewDetectorWithPaths(t *testing.T) {
+func TestCreateDetectorWithPaths(t *testing.T) {
 	v2Path := "/custom/v2/path"
 	v1Path := "/custom/v1/path"
-	detector := NewDetectorWithPaths(v2Path, v1Path)
+
+	detector := CreateWithPaths(v2Path, v1Path)
+
+	if detector == nil {
+		t.Error("Expected non-nil detector")
+		return
+	}
 
 	if detector.CgroupsV2Path != v2Path {
-		t.Errorf("Expected CgroupsV2Path='%s', got %s", v2Path, detector.CgroupsV2Path)
+		t.Errorf("Expected v2 path '%s', got '%s'", v2Path, detector.CgroupsV2Path)
 	}
 
 	if detector.CgroupsV1Path != v1Path {
-		t.Errorf("Expected CgroupsV1Path='%s', got %s", v1Path, detector.CgroupsV1Path)
+		t.Errorf("Expected v1 path '%s', got '%s'", v1Path, detector.CgroupsV1Path)
 	}
 
 	if detector.HostDetector == nil {
-		t.Error("Expected HostDetector to be initialized, got nil")
+		t.Error("Expected non-nil host detector")
 	}
 }
 
-func TestNewDetectorWithPathsAndHost(t *testing.T) {
+func TestCreateDetectorWithPathsAndHost(t *testing.T) {
 	v2Path := "/custom/v2/path"
 	v1Path := "/custom/v1/path"
-	hostDetector := host.NewDetectorWithPath("/custom/meminfo/path")
+	hostDetector := host.Create()
 
-	detector := NewDetectorWithPathsAndHost(v2Path, v1Path, hostDetector)
+	detector := CreateWithPathsAndHost(v2Path, v1Path, hostDetector)
+
+	if detector == nil {
+		t.Error("Expected non-nil detector")
+		return
+	}
 
 	if detector.CgroupsV2Path != v2Path {
-		t.Errorf("Expected CgroupsV2Path='%s', got %s", v2Path, detector.CgroupsV2Path)
+		t.Errorf("Expected v2 path '%s', got '%s'", v2Path, detector.CgroupsV2Path)
 	}
 
 	if detector.CgroupsV1Path != v1Path {
-		t.Errorf("Expected CgroupsV1Path='%s', got %s", v1Path, detector.CgroupsV1Path)
+		t.Errorf("Expected v1 path '%s', got '%s'", v1Path, detector.CgroupsV1Path)
 	}
 
 	if detector.HostDetector != hostDetector {
-		t.Error("Expected custom HostDetector to be set")
+		t.Error("Expected the same host detector instance")
 	}
 }
 
@@ -129,7 +145,7 @@ func TestReadCgroupsV2(t *testing.T) {
 				}
 			}
 
-			detector := NewDetectorWithPaths(testFile, "")
+			detector := CreateWithPaths(testFile, "")
 			result, err := detector.readCgroupsV2()
 
 			if tt.expectError {
@@ -220,7 +236,7 @@ func TestReadCgroupsV1(t *testing.T) {
 				}
 			}
 
-			detector := NewDetectorWithPaths("", testFile)
+			detector := CreateWithPaths("", testFile)
 			result, err := detector.readCgroupsV1()
 
 			if tt.expectError {
@@ -329,7 +345,7 @@ func TestDetectContainerMemory(t *testing.T) {
 				}
 			}
 
-			detector := NewDetectorWithPathsAndHost(v2File, v1File, host.NewDetectorWithPath("/nonexistent/meminfo"))
+			detector := CreateWithPathsAndHost(v2File, v1File, host.CreateWithPath("/nonexistent/meminfo"))
 			result := detector.DetectContainerMemory()
 
 			if result != tt.expected {
@@ -442,8 +458,8 @@ MemAvailable:    2345678 kB`,
 			}
 
 			// Create detector with custom host detector
-			hostDetector := host.NewDetectorWithPath(hostMemInfoFile)
-			detector := NewDetectorWithPathsAndHost(v2File, v1File, hostDetector)
+			hostDetector := host.CreateWithPath(hostMemInfoFile)
+			detector := CreateWithPathsAndHost(v2File, v1File, hostDetector)
 
 			result := detector.DetectContainerMemory()
 
@@ -489,8 +505,8 @@ MemFree:         1234567 kB`
 		t.Fatalf("Failed to write host meminfo test file: %v", err)
 	}
 
-	hostDetector := host.NewDetectorWithPath(hostMemInfoFile)
-	detector := NewDetectorWithPathsAndHost(v2File, v1File, hostDetector)
+	hostDetector := host.CreateWithPath(hostMemInfoFile)
+	detector := CreateWithPathsAndHost(v2File, v1File, hostDetector)
 
 	result := detector.DetectContainerMemory()
 
@@ -503,7 +519,7 @@ MemFree:         1234567 kB`
 
 func TestFileNotFound(t *testing.T) {
 	// Use a mock host detector that also can't find files
-	detector := NewDetectorWithPathsAndHost("/nonexistent/v2/path", "/nonexistent/v1/path", host.NewDetectorWithPath("/nonexistent/meminfo"))
+	detector := CreateWithPathsAndHost("/nonexistent/v2/path", "/nonexistent/v1/path", host.CreateWithPath("/nonexistent/meminfo"))
 
 	// Should return 0 when files don't exist
 	result := detector.DetectContainerMemory()
@@ -534,7 +550,7 @@ func BenchmarkDetectContainerMemory(b *testing.B) {
 		b.Fatalf("Failed to write test file: %v", err)
 	}
 
-	detector := NewDetectorWithPaths(v2File, "")
+	detector := CreateWithPaths(v2File, "")
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

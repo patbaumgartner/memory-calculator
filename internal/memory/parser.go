@@ -1,4 +1,49 @@
-// Package memory handles memory parsing, formatting, and validation.
+// Package memory provides comprehensive memory size handling, parsing, and formatting utilities.
+//
+// This package offers flexible memory size parsing with support for decimal values and multiple
+// unit formats, efficient memory size conversion and formatting, and JVM-compatible memory
+// argument generation. It serves as the foundation for all memory-related operations in the
+// memory calculator.
+//
+// Key Features:
+//   - Flexible unit parsing: B, K, KB, M, MB, G, GB, T, TB (case-insensitive)
+//   - Decimal value support: 1.5G, 2.25GB, 512.5M with proper precision handling
+//   - Binary-based calculations: All units use powers of 1024 (not 1000)
+//   - JVM compatibility: Generates memory arguments compatible with all JVM versions
+//   - Human-readable formatting: Automatically selects appropriate units for display
+//   - Validation and error handling: Comprehensive input validation with detailed error messages
+//
+// Memory Size Calculation:
+//   - Bytes (B): Base unit, direct byte values
+//   - Kilobytes (K/KB): 1024 bytes
+//   - Megabytes (M/MB): 1024² bytes (1,048,576 bytes)
+//   - Gigabytes (G/GB): 1024³ bytes (1,073,741,824 bytes)
+//   - Terabytes (T/TB): 1024⁴ bytes (1,099,511,627,776 bytes)
+//
+// Supported Input Formats:
+//   - Numeric only: "1073741824" (interpreted as bytes)
+//   - With units: "1G", "1GB", "1.5g", "2.25GB", "512m"
+//   - Case-insensitive: "1g", "1GB", "1Gb" all equivalent
+//   - Decimal precision: Up to 2 decimal places for fractional values
+//
+// Usage Examples:
+//
+//	// Parse memory strings
+//	size, err := ParseSize("2G")          // 2,147,483,648 bytes
+//	size, err := ParseSize("1.5GB")       // 1,610,612,736 bytes
+//	size, err := ParseSize("512M")        // 536,870,912 bytes
+//
+//	// Create from bytes
+//	size := SizeFromBytes(1073741824)     // 1GB
+//
+//	// Format for display
+//	fmt.Println(size.String())            // "1.00 GB"
+//
+//	// Generate JVM arguments
+//	fmt.Println(size.ToJVMArg())          // "1048576K"
+//
+// The Size type provides thread-safe operations and immutable semantics, making it suitable
+// for concurrent use across multiple goroutines without synchronization requirements.
 package memory
 
 import (
@@ -10,9 +55,17 @@ import (
 )
 
 const (
-	// Memory size constants in bytes
+	// Binary-based memory size constants using powers of 1024
+	// These constants follow the traditional binary interpretation used by most
+	// operating systems and JVMs, where each unit is 1024 times the previous unit.
+
+	// KB represents one kilobyte in binary notation (1024 bytes)
 	KB = 1024
+
+	// MB represents one megabyte in binary notation (1,048,576 bytes)
 	MB = KB * 1024
+
+	// GB represents one gigabyte in binary notation (1,073,741,824 bytes)
 	GB = MB * 1024
 	TB = GB * 1024
 
@@ -23,8 +76,8 @@ const (
 // Parser handles memory string parsing and formatting.
 type Parser struct{}
 
-// NewParser creates a new memory parser.
-func NewParser() *Parser {
+// CreateParser creates a new memory parser.
+func CreateParser() *Parser {
 	return &Parser{}
 }
 

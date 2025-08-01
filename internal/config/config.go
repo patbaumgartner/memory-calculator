@@ -27,11 +27,11 @@ type Config struct {
 	CommitHash   string
 }
 
-// DefaultConfig returns a configuration with default values.
-func DefaultConfig() *Config {
+// Load returns a configuration loaded from environment variables.
+func Load() *Config {
 	return &Config{
 		ThreadCount:      getEnvOrDefault("BPL_JVM_THREAD_COUNT", "250"),
-		LoadedClassCount: getEnvOrDefault("BPL_JVM_LOADED_CLASS_COUNT", "35000"),
+		LoadedClassCount: os.Getenv("BPL_JVM_LOADED_CLASS_COUNT"), // No default - should be calculated
 		HeadRoom:         getEnvOrDefault("BPL_JVM_HEAD_ROOM", "0"),
 		BuildVersion:     "dev",
 		BuildTime:        "unknown",
@@ -46,9 +46,11 @@ func (c *Config) Validate() error {
 		return errors.NewConfigurationError("thread-count", c.ThreadCount, "must be a positive integer")
 	}
 
-	// Validate loaded class count
-	if classCount, err := strconv.Atoi(c.LoadedClassCount); err != nil || classCount < 1 {
-		return errors.NewConfigurationError("loaded-class-count", c.LoadedClassCount, "must be a positive integer")
+	// Validate loaded class count (only if provided)
+	if c.LoadedClassCount != "" {
+		if classCount, err := strconv.Atoi(c.LoadedClassCount); err != nil || classCount < 1 {
+			return errors.NewConfigurationError("loaded-class-count", c.LoadedClassCount, "must be a positive integer")
+		}
 	}
 
 	// Validate head room
@@ -62,7 +64,9 @@ func (c *Config) Validate() error {
 // SetEnvironmentVariables sets buildpack environment variables from the config.
 func (c *Config) SetEnvironmentVariables() {
 	_ = os.Setenv("BPL_JVM_THREAD_COUNT", c.ThreadCount)
-	_ = os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", c.LoadedClassCount)
+	if c.LoadedClassCount != "" {
+		_ = os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", c.LoadedClassCount)
+	}
 	_ = os.Setenv("BPL_JVM_HEAD_ROOM", c.HeadRoom)
 }
 

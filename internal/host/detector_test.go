@@ -6,16 +6,16 @@ import (
 	"testing"
 )
 
-func TestNewDetector(t *testing.T) {
-	detector := NewDetector()
+func TestCreateDetector(t *testing.T) {
+	detector := Create()
 	if detector.MemInfoPath != LinuxMemInfoPath {
 		t.Errorf("Expected MemInfoPath to be %s, got %s", LinuxMemInfoPath, detector.MemInfoPath)
 	}
 }
 
-func TestNewDetectorWithPath(t *testing.T) {
+func TestCreateDetectorWithPath(t *testing.T) {
 	customPath := "/custom/path/meminfo"
-	detector := NewDetectorWithPath(customPath)
+	detector := CreateWithPath(customPath)
 	if detector.MemInfoPath != customPath {
 		t.Errorf("Expected MemInfoPath to be %s, got %s", customPath, detector.MemInfoPath)
 	}
@@ -111,7 +111,7 @@ Buffers:          123456 kB`,
 			tmpFile.Close()
 
 			// Test with custom path
-			detector := NewDetectorWithPath(tmpFile.Name())
+			detector := CreateWithPath(tmpFile.Name())
 			memory := detector.detectLinuxMemory()
 
 			if memory != tt.expectedMemory {
@@ -122,7 +122,7 @@ Buffers:          123456 kB`,
 }
 
 func TestDetectLinuxMemoryFileNotFound(t *testing.T) {
-	detector := NewDetectorWithPath("/nonexistent/path/meminfo")
+	detector := CreateWithPath("/nonexistent/path/meminfo")
 	memory := detector.detectLinuxMemory()
 
 	if memory != 0 {
@@ -131,7 +131,7 @@ func TestDetectLinuxMemoryFileNotFound(t *testing.T) {
 }
 
 func TestDetectDarwinMemory(t *testing.T) {
-	detector := NewDetector()
+	detector := Create()
 	memory := detector.detectDarwinMemory()
 
 	// Darwin memory detection should return some positive value or 0
@@ -152,7 +152,7 @@ func TestDetectDarwinMemory(t *testing.T) {
 }
 
 func TestDetectHostMemory(t *testing.T) {
-	detector := NewDetector()
+	detector := Create()
 
 	// Test based on current OS
 	switch runtime.GOOS {
@@ -205,7 +205,7 @@ MemAvailable:    2345678 kB`
 	}
 	tmpFile.Close()
 
-	detector := NewDetectorWithPath(tmpFile.Name())
+	detector := CreateWithPath(tmpFile.Name())
 
 	// Force Linux detection by calling detectLinuxMemory directly
 	memory := detector.detectLinuxMemory()
@@ -232,7 +232,7 @@ func TestIsHostMemoryDetectionSupported(t *testing.T) {
 }
 
 func TestPlatformSpecificBehavior(t *testing.T) {
-	detector := NewDetector()
+	detector := Create()
 
 	t.Run("Current platform detection", func(t *testing.T) {
 		memory := detector.DetectHostMemory()
@@ -298,7 +298,7 @@ MemAvailable:   33554432 kB`,
 			}
 			tmpFile.Close()
 
-			detector := NewDetectorWithPath(tmpFile.Name())
+			detector := CreateWithPath(tmpFile.Name())
 			memory := detector.detectLinuxMemory()
 
 			if memory != tt.expectedMemory {

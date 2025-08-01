@@ -8,7 +8,7 @@ import (
 )
 
 func TestParseMemoryString(t *testing.T) {
-	parser := NewParser()
+	parser := CreateParser()
 
 	tests := []struct {
 		name      string
@@ -99,7 +99,7 @@ func TestParseMemoryString(t *testing.T) {
 }
 
 func TestFormatMemory(t *testing.T) {
-	parser := NewParser()
+	parser := CreateParser()
 
 	tests := []struct {
 		name     string
@@ -132,7 +132,7 @@ func TestFormatMemory(t *testing.T) {
 }
 
 func TestValidateMemorySize(t *testing.T) {
-	parser := NewParser()
+	parser := CreateParser()
 
 	tests := []struct {
 		name      string
@@ -164,16 +164,16 @@ func TestValidateMemorySize(t *testing.T) {
 	}
 }
 
-func TestNewParser(t *testing.T) {
-	parser := NewParser()
+func TestCreateParser(t *testing.T) {
+	parser := CreateParser()
 	if parser == nil {
-		t.Error("NewParser() returned nil")
+		t.Error("CreateParser() returned nil")
 	}
 }
 
 // Benchmark tests
 func BenchmarkParseMemoryString(b *testing.B) {
-	parser := NewParser()
+	parser := CreateParser()
 	inputs := []string{"1G", "512M", "2048K", "1073741824"}
 
 	b.ResetTimer()
@@ -184,7 +184,7 @@ func BenchmarkParseMemoryString(b *testing.B) {
 }
 
 func BenchmarkFormatMemory(b *testing.B) {
-	parser := NewParser()
+	parser := CreateParser()
 	sizes := []int64{1024, 1024 * 1024, 1024 * 1024 * 1024, 2 * 1024 * 1024 * 1024}
 
 	b.ResetTimer()
@@ -218,7 +218,7 @@ func TestConstants(t *testing.T) {
 
 // Property-based testing for memory parsing
 func TestParseMemoryStringProperty(t *testing.T) {
-	parser := NewParser()
+	parser := CreateParser()
 
 	// Test that parsing and formatting a valid memory string is consistent
 	testCases := []string{"1G", "2G", "512M", "1024M", "2048K"}

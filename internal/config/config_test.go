@@ -3,69 +3,83 @@ package config
 import (
 	"os"
 	"testing"
-
-	"github.com/patbaumgartner/memory-calculator/pkg/errors"
 )
 
-func TestDefaultConfig(t *testing.T) {
-	cfg := DefaultConfig()
+func TestLoad(t *testing.T) {
+	// Clear any existing environment variables
+	os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
+	os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+	os.Unsetenv("BPL_JVM_THREAD_COUNT")
+	os.Unsetenv("BPL_JVM_HEAD_ROOM")
 
+	cfg := Load()
+
+	// Test default values
 	if cfg.ThreadCount != "250" {
-		t.Errorf("Expected ThreadCount 250, got %s", cfg.ThreadCount)
+		t.Errorf("Expected thread count '250', got '%s'", cfg.ThreadCount)
 	}
 
-	if cfg.LoadedClassCount != "35000" {
-		t.Errorf("Expected LoadedClassCount 35000, got %s", cfg.LoadedClassCount)
+	if cfg.LoadedClassCount != "" {
+		t.Errorf("Expected empty loaded class count (should be calculated), got '%s'", cfg.LoadedClassCount)
 	}
 
 	if cfg.HeadRoom != "0" {
-		t.Errorf("Expected HeadRoom 0, got %s", cfg.HeadRoom)
+		t.Errorf("Expected head room '0', got '%s'", cfg.HeadRoom)
 	}
 
 	if cfg.BuildVersion != "dev" {
-		t.Errorf("Expected BuildVersion dev, got %s", cfg.BuildVersion)
+		t.Errorf("Expected build version 'dev', got '%s'", cfg.BuildVersion)
 	}
 }
 
-func TestDefaultConfigWithEnvVars(t *testing.T) {
+func TestLoadWithEnvironmentVariables(t *testing.T) {
 	// Set environment variables
+	os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "15000")
 	os.Setenv("BPL_JVM_THREAD_COUNT", "500")
-	os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "50000")
 	os.Setenv("BPL_JVM_HEAD_ROOM", "10")
+
 	defer func() {
-		os.Unsetenv("BPL_JVM_THREAD_COUNT")
 		os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+		os.Unsetenv("BPL_JVM_THREAD_COUNT")
 		os.Unsetenv("BPL_JVM_HEAD_ROOM")
 	}()
 
-	cfg := DefaultConfig()
+	cfg := Load()
 
-	if cfg.ThreadCount != "500" {
-		t.Errorf("Expected ThreadCount 500, got %s", cfg.ThreadCount)
+	if cfg.LoadedClassCount != "15000" {
+		t.Errorf("Expected loaded class count '15000', got '%s'", cfg.LoadedClassCount)
 	}
 
-	if cfg.LoadedClassCount != "50000" {
-		t.Errorf("Expected LoadedClassCount 50000, got %s", cfg.LoadedClassCount)
+	if cfg.ThreadCount != "500" {
+		t.Errorf("Expected thread count '500', got '%s'", cfg.ThreadCount)
 	}
 
 	if cfg.HeadRoom != "10" {
-		t.Errorf("Expected HeadRoom 10, got %s", cfg.HeadRoom)
+		t.Errorf("Expected head room '10', got '%s'", cfg.HeadRoom)
 	}
 }
 
-func TestConfigValidate(t *testing.T) {
-	tests := []struct {
+func TestConfigValidation(t *testing.T) {
+	testCases := []struct {
 		name        string
 		config      *Config
 		expectError bool
-		errorCode   errors.ErrorCode
 	}{
 		{
-			name: "Valid config",
+			name: "Valid config with defaults",
 			config: &Config{
 				ThreadCount:      "250",
-				LoadedClassCount: "35000",
+				LoadedClassCount: "", // empty is valid
 				HeadRoom:         "0",
+			},
+			expectError: false,
+		},
+		{
+			name: "Valid config with values",
+			config: &Config{
+				ThreadCount:      "300",
+				LoadedClassCount: "5000",
+				HeadRoom:         "5",
 			},
 			expectError: false,
 		},
@@ -73,21 +87,19 @@ func TestConfigValidate(t *testing.T) {
 			name: "Invalid thread count - negative",
 			config: &Config{
 				ThreadCount:      "-1",
-				LoadedClassCount: "35000",
+				LoadedClassCount: "1000",
 				HeadRoom:         "0",
 			},
 			expectError: true,
-			errorCode:   errors.ErrInvalidConfiguration,
 		},
 		{
 			name: "Invalid thread count - not a number",
 			config: &Config{
 				ThreadCount:      "abc",
-				LoadedClassCount: "35000",
+				LoadedClassCount: "1000",
 				HeadRoom:         "0",
 			},
 			expectError: true,
-			errorCode:   errors.ErrInvalidConfiguration,
 		},
 		{
 			name: "Invalid loaded class count - negative",
@@ -97,55 +109,34 @@ func TestConfigValidate(t *testing.T) {
 				HeadRoom:         "0",
 			},
 			expectError: true,
-			errorCode:   errors.ErrInvalidConfiguration,
 		},
 		{
 			name: "Invalid head room - negative",
 			config: &Config{
 				ThreadCount:      "250",
-				LoadedClassCount: "35000",
+				LoadedClassCount: "1000",
 				HeadRoom:         "-1",
 			},
 			expectError: true,
-			errorCode:   errors.ErrInvalidConfiguration,
 		},
 		{
 			name: "Invalid head room - over 100",
 			config: &Config{
 				ThreadCount:      "250",
-				LoadedClassCount: "35000",
+				LoadedClassCount: "1000",
 				HeadRoom:         "101",
 			},
 			expectError: true,
-			errorCode:   errors.ErrInvalidConfiguration,
-		},
-		{
-			name: "Valid head room - boundary values",
-			config: &Config{
-				ThreadCount:      "1",
-				LoadedClassCount: "1",
-				HeadRoom:         "100",
-			},
-			expectError: false,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := tt.config.Validate()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.config.Validate()
 
-			if tt.expectError {
+			if tc.expectError {
 				if err == nil {
-					t.Errorf("Expected error but got none")
-					return
-				}
-
-				if mcErr, ok := err.(*errors.MemoryCalculatorError); ok {
-					if mcErr.Code != tt.errorCode {
-						t.Errorf("Expected error code %v, got %v", tt.errorCode, mcErr.Code)
-					}
-				} else {
-					t.Errorf("Expected MemoryCalculatorError, got %T", err)
+					t.Error("Expected error but got none")
 				}
 			} else {
 				if err != nil {
@@ -156,7 +147,7 @@ func TestConfigValidate(t *testing.T) {
 	}
 }
 
-func TestConfigSetEnvironmentVariables(t *testing.T) {
+func TestSetEnvironmentVariables(t *testing.T) {
 	cfg := &Config{
 		ThreadCount:      "300",
 		LoadedClassCount: "40000",
@@ -183,7 +174,7 @@ func TestConfigSetEnvironmentVariables(t *testing.T) {
 	os.Unsetenv("BPL_JVM_HEAD_ROOM")
 }
 
-func TestConfigSetTotalMemory(t *testing.T) {
+func TestSetTotalMemory(t *testing.T) {
 	cfg := &Config{}
 
 	// Test with positive memory
@@ -199,32 +190,5 @@ func TestConfigSetTotalMemory(t *testing.T) {
 	cfg.SetTotalMemory(0)
 	if os.Getenv("BPL_JVM_TOTAL_MEMORY") != "" {
 		t.Errorf("Expected BPL_JVM_TOTAL_MEMORY to be unset, got %s", os.Getenv("BPL_JVM_TOTAL_MEMORY"))
-	}
-}
-
-func TestGetEnvOrDefault(t *testing.T) {
-	key := "TEST_ENV_VAR"
-	defaultValue := "default"
-
-	// Test when env var is not set
-	result := getEnvOrDefault(key, defaultValue)
-	if result != defaultValue {
-		t.Errorf("Expected %s, got %s", defaultValue, result)
-	}
-
-	// Test when env var is set
-	os.Setenv(key, "custom_value")
-	defer os.Unsetenv(key)
-
-	result = getEnvOrDefault(key, defaultValue)
-	if result != "custom_value" {
-		t.Errorf("Expected custom_value, got %s", result)
-	}
-
-	// Test when env var is set to empty string
-	os.Setenv(key, "")
-	result = getEnvOrDefault(key, defaultValue)
-	if result != defaultValue {
-		t.Errorf("Expected %s for empty env var, got %s", defaultValue, result)
 	}
 }

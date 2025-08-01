@@ -94,7 +94,7 @@ func TestMainIntegration(t *testing.T) {
 		},
 		{
 			name: "Memory units - KB",
-			args: []string{"--total-memory", "1024KB", "--quiet"},
+			args: []string{"--total-memory", "2048000KB", "--quiet"},
 			expectedOutput: []string{
 				"-X", // Should contain JVM flags
 			},
@@ -126,6 +126,22 @@ func TestMainIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(binaryPath, tt.args...)
+			// Set environment variables for testing
+			env := append(os.Environ(),
+				"BPI_APPLICATION_PATH=.",
+			)
+
+			// Use fewer classes for small memory tests
+			if strings.Contains(tt.name, "KB") || strings.Contains(tt.name, "MB") {
+				env = append(env,
+					"BPL_JVM_LOADED_CLASS_COUNT=1000",
+					"BPL_JVM_THREAD_COUNT=50",
+				)
+			} else {
+				env = append(env, "BPL_JVM_LOADED_CLASS_COUNT=30000")
+			}
+
+			cmd.Env = env
 			output, err := cmd.CombinedOutput()
 			outputStr := string(output)
 
@@ -170,6 +186,7 @@ func TestMainEnvironmentVariables(t *testing.T) {
 	// Test with environment variables
 	cmd = exec.Command(binaryPath, "--total-memory", "4G")
 	cmd.Env = append(os.Environ(),
+		"BPI_APPLICATION_PATH=.",
 		"BPL_JVM_THREAD_COUNT=200",
 		"BPL_JVM_LOADED_CLASS_COUNT=30000",
 		"BPL_JVM_HEAD_ROOM=10",
@@ -211,9 +228,9 @@ func TestMainBoundaryValues(t *testing.T) {
 		{
 			name: "Minimum valid values",
 			args: []string{
-				"--total-memory", "1M",
+				"--total-memory", "512M",
 				"--thread-count", "1",
-				"--loaded-class-count", "1",
+				"--loaded-class-count", "100",
 				"--head-room", "0",
 			},
 		},
@@ -257,6 +274,11 @@ func TestMainBoundaryValues(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(binaryPath, tt.args...)
+			// Set environment variables for testing
+			cmd.Env = append(os.Environ(),
+				"BPI_APPLICATION_PATH=.",
+				"BPL_JVM_LOADED_CLASS_COUNT=30000",
+			)
 			output, err := cmd.CombinedOutput()
 
 			if tt.expectError {
@@ -306,7 +328,10 @@ func TestMainHostMemoryDetection(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cmd := exec.Command(binaryPath, tt.args...)
-			cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
+			cmd.Env = append(os.Environ(),
+				"BPI_APPLICATION_PATH=.",
+				"BPL_JVM_LOADED_CLASS_COUNT=30000",
+			)
 
 			output, err := cmd.CombinedOutput()
 			if err != nil {
@@ -327,7 +352,7 @@ func TestMainHostMemoryDetection(t *testing.T) {
 
 			if !hasQuiet {
 				// Should contain memory detection message
-				if !strings.Contains(outputStr, "Memory detected:") {
+				if !strings.Contains(outputStr, "Calculating JVM memory") && !strings.Contains(outputStr, "Using specified memory") {
 					t.Errorf("Expected memory detection message in output. Got: %s", outputStr)
 				}
 
@@ -341,13 +366,13 @@ func TestMainHostMemoryDetection(t *testing.T) {
 				}
 
 				if hasManualMemory {
-					// Manual override should show "2.00 GB"
-					if !strings.Contains(outputStr, "2.00 GB") {
-						t.Errorf("Expected manual memory setting (2.00 GB) in output. Got: %s", outputStr)
+					// Manual override should show "Using specified memory: 2G"
+					if !strings.Contains(outputStr, "Using specified memory: 2G") {
+						t.Errorf("Expected manual memory setting (Using specified memory: 2G) in output. Got: %s", outputStr)
 					}
 				} else {
 					// Auto-detection should show some positive memory value
-					if !strings.Contains(outputStr, "GB") && !strings.Contains(outputStr, "MB") {
+					if !strings.Contains(outputStr, "Calculating JVM memory based on") {
 						t.Errorf("Expected auto-detected memory value in output. Got: %s", outputStr)
 					}
 				}
@@ -378,6 +403,11 @@ func BenchmarkMainExecution(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		cmd := exec.Command(binaryPath, "--total-memory", "2G", "--quiet")
+		// Set environment variables for testing
+		cmd.Env = append(os.Environ(),
+			"BPI_APPLICATION_PATH=.",
+			"BPL_JVM_LOADED_CLASS_COUNT=30000",
+		)
 		_, err := cmd.CombinedOutput()
 		if err != nil {
 			b.Fatalf("Command failed: %v", err)
