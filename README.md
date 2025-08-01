@@ -104,6 +104,130 @@ JAVA_TOOL_OPTIONS="-Xmx324661K -Xss1M -XX:MaxMetaspaceSize=211914K -XX:MaxDirect
 ```
 -Xmx324661K -Xss1M -XX:MaxMetaspaceSize=211914K -XX:MaxDirectMemorySize=10M -XX:ReservedCodeCacheSize=240M
 ```
+
+## 🔧 Setting JAVA_TOOL_OPTIONS
+
+The memory calculator outputs the calculated JVM arguments, but you need to **capture and set** the `JAVA_TOOL_OPTIONS` environment variable in your shell or application.
+
+### Interactive Shell Usage
+
+```bash
+# Method 1: Direct export with command substitution
+export JAVA_TOOL_OPTIONS="$(./memory-calculator --total-memory=2G --quiet)"
+
+# Method 2: Use the provided helper script
+source ./examples/set-java-options.sh --total-memory=2G --thread-count=300
+
+# Method 3: Store in variable first
+JVM_OPTS="$(./memory-calculator --total-memory=1G --quiet)"
+export JAVA_TOOL_OPTIONS="$JVM_OPTS"
+
+# Verify it's set
+echo "JVM Options: $JAVA_TOOL_OPTIONS"
+```
+
+### Script Integration
+
+```bash
+#!/bin/bash
+# startup.sh - Application startup script
+
+# Calculate and set JVM options
+export JAVA_TOOL_OPTIONS="$(./memory-calculator --quiet)"
+
+# Start your Java application
+java -jar myapp.jar
+```
+
+### Docker/Container Usage
+
+```dockerfile
+# Method 1: Multi-stage build
+FROM golang:1.21 as calculator
+COPY . /build
+WORKDIR /build
+RUN make build-minimal
+
+FROM openjdk:17-jre
+COPY --from=calculator /build/memory-calculator /usr/local/bin/
+
+# Set JVM options at runtime
+RUN echo '#!/bin/bash\nexport JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)"\nexec "$@"' > /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["java", "-jar", "app.jar"]
+```
+
+```dockerfile
+# Method 2: Runtime calculation
+FROM openjdk:17-jre
+COPY memory-calculator /usr/local/bin/
+COPY app.jar /app.jar
+
+CMD export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)" && java -jar /app.jar
+```
+
+### Kubernetes Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-app
+spec:
+  template:
+    spec:
+      initContainers:
+      - name: memory-calculator
+        image: myapp:latest
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          memory-calculator --quiet > /shared/java-opts
+        volumeMounts:
+        - name: shared-data
+          mountPath: /shared
+      containers:
+      - name: app
+        image: myapp:latest
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          export JAVA_TOOL_OPTIONS="$(cat /shared/java-opts)"
+          java -jar app.jar
+        volumeMounts:
+        - name: shared-data
+          mountPath: /shared
+      volumes:
+      - name: shared-data
+        emptyDir: {}
+```
+
+### Why Environment Variables Aren't Set Automatically
+
+**Technical Explanation:** A child process (the memory calculator) cannot modify the environment variables of its parent process (your shell) due to Unix process isolation. This is a security feature that prevents programs from arbitrarily changing your shell environment.
+
+**Solutions:**
+1. **Command Substitution**: Use `$(command)` to capture output
+2. **Source Scripts**: Use `source script.sh` to run commands in the current shell
+3. **Application Integration**: Set variables within your application startup process
+
+### Helper Script
+
+The repository includes `examples/set-java-options.sh` for convenient usage:
+
+```bash
+#!/bin/bash
+# Usage: source examples/set-java-options.sh [calculator-options]
+source ./examples/set-java-options.sh --total-memory=2G --thread-count=300
+```
+
+This script automatically:
+- Runs the memory calculator with your specified options
+- Captures the output and sets `JAVA_TOOL_OPTIONS`
+- Provides success/failure feedback
+- Handles error cases gracefully
+
 ## 📚 Documentation
 
 ### Command Line Options
@@ -394,6 +518,27 @@ make tools              # Install development tools
 make tools-check        # Verify tools are available
 make help               # Show all available targets
 ```
+
+## 📖 Additional Documentation
+
+### Comprehensive Guides
+- **[USAGE_GUIDE.md](USAGE_GUIDE.md)** - Complete integration patterns and troubleshooting
+- **[examples/](examples/)** - Ready-to-use scripts for Docker, Kubernetes, and more
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development and contribution guidelines
+- **[SECURITY.md](SECURITY.md)** - Security policy and vulnerability reporting
+
+### Quick References
+- **[examples/set-java-options.sh](examples/set-java-options.sh)** - Helper script for interactive development
+- **[Makefile](Makefile)** - All build targets and development commands
+- **[PROJECT_SETUP.md](PROJECT_SETUP.md)** - Development environment setup
+
+### Integration Examples
+| Scenario | File | Description |
+|----------|------|-------------|
+| Simple Scripts | [examples/simple-startup.sh](examples/simple-startup.sh) | Basic usage with fallbacks |
+| Docker | [examples/Dockerfile](examples/Dockerfile) | Production container setup |
+| Kubernetes | [examples/kubernetes.yaml](examples/kubernetes.yaml) | Cloud-native deployment |
+| Development | [examples/set-java-options.sh](examples/set-java-options.sh) | Interactive development helper |
 
 ## 🤝 Contributing
 

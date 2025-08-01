@@ -1,0 +1,195 @@
+# examples/kubernetes.yaml
+# Complete Kubernetes deployment with JVM memory optimization
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jvm-calculator-config
+data:
+  calculate-jvm-opts.sh: |
+    #!/bin/bash
+    set -e
+    
+    echo "🧮 Calculating JVM options for Kubernetes pod..."
+    
+    # Get memory limit from Kubernetes downward API
+    MEMORY_LIMIT_BYTES="${MEMORY_LIMIT_BYTES:-$(cat /sys/fs/cgroup/memory.max 2>/dev/null)}"
+    
+    if [ "$MEMORY_LIMIT_BYTES" != "max" ] && [ -n "$MEMORY_LIMIT_BYTES" ]; then
+        MEMORY_GB=$((MEMORY_LIMIT_BYTES / 1024 / 1024 / 1024))
+        echo "📊 Detected ${MEMORY_GB}GB memory limit from Kubernetes"
+        
+        # Calculate with explicit memory limit
+        JVM_OPTS="$(memory-calculator --total-memory=${MEMORY_GB}G --thread-count=${THREAD_COUNT:-250} --quiet)"
+    else
+        echo "⚠️  No memory limit detected, using defaults"
+        JVM_OPTS="$(memory-calculator --total-memory=1G --thread-count=${THREAD_COUNT:-250} --quiet)"
+    fi
+    
+    echo "$JVM_OPTS" > /shared/java-opts
+    echo "✅ JVM options written to shared volume: $JVM_OPTS"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: java-app
+  labels:
+    app: java-app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: java-app
+  template:
+    metadata:
+      labels:
+        app: java-app
+    spec:
+      # Init container to calculate JVM options
+      initContainers:
+      - name: jvm-calculator
+        image: myapp:latest  # Replace with your image
+        command: ["/bin/sh"]
+        args: ["/scripts/calculate-jvm-opts.sh"]
+        env:
+        - name: MEMORY_LIMIT_BYTES
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+        - name: THREAD_COUNT
+          value: "300"
+        volumeMounts:
+        - name: jvm-config
+          mountPath: /shared
+        - name: calculator-scripts
+          mountPath: /scripts
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "10m"
+          limits:
+            memory: "128Mi"
+            cpu: "50m"
+      
+      # Main application container
+      containers:
+      - name: app
+        image: myapp:latest  # Replace with your image
+        command: ["/bin/sh"]
+        args:
+        - -c
+        - |
+          # Load calculated JVM options
+          if [ -f /shared/java-opts ]; then
+            export JAVA_TOOL_OPTIONS="$(cat /shared/java-opts)"
+            echo "🚀 Starting with JVM options: $JAVA_TOOL_OPTIONS"
+          else
+            echo "⚠️  No calculated JVM options found, using defaults"
+          fi
+          
+          # Start the application
+          exec java -jar /app/myapp.jar
+        
+        # Environment variables
+        env:
+        - name: JAVA_OPTS_FILE
+          value: "/shared/java-opts"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        
+        # Volume mounts
+        volumeMounts:
+        - name: jvm-config
+          mountPath: /shared
+        
+        # Resource limits (these are detected by the calculator)
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        
+        readinessProbe:
+          httpGet:
+            path: /ready  
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        
+        # Security context
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+      
+      # Volumes
+      volumes:
+      - name: jvm-config
+        emptyDir: {}
+      - name: calculator-scripts
+        configMap:
+          name: jvm-calculator-config
+          defaultMode: 0755
+      
+      # Security context for pod
+      securityContext:
+        fsGroup: 1001
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: java-app-service
+spec:
+  selector:
+    app: java-app
+  ports:
+  - port: 80
+    targetPort: 8080
+    name: http
+  type: ClusterIP
+
+---
+# Optional: HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: java-app-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: java-app
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
