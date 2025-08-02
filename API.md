@@ -1,134 +1,350 @@
-# API Documentation
+# JVM Memory Calculator - API Reference
 
-## Table of Contents
+Complete Go API for calculating optimal JVM memory settings in containerized environments.
 
-- [Overview](#overview)
-- [Package Structure](#package-structure)
-- [Build Variants](#build-variants)
-- [Core API](#core-api)
-- [Configuration](#configuration)
-- [Memory Calculation](#memory-calculation)
-- [Container Detection](#container-detection)
-- [Error Handling](#error-handling)
-- [Examples](#examples)
+## 📚 Quick Navigation
 
-## Overview
+- [🚀 Quick Start](#-quick-start) - Get started immediately
+- [📦 Package Overview](#-package-overview) - Architecture and responsibilities  
+- [🧮 Core API](#-core-api) - Essential functions and types
+- [💾 Memory Management](#-memory-management) - Size handling and operations
+- [� Examples](#-examples) - Real-world usage patterns
 
-The memory calculator provides a comprehensive Go API for calculating optimal JVM memory settings in containerized environments. The API is designed around a modular architecture that separates concerns into focused packages and supports **multiple build variants** for optimized deployment scenarios.
+*For detailed examples and integration patterns, see [USAGE_GUIDE.md](USAGE_GUIDE.md)*
 
-## Package Structure
+## 🚀 Quick Start
+
+### Basic Usage
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    
+    "github.com/patbaumgartner/memory-calculator/internal/calculator"
+)
+
+func main() {
+    // Create memory calculator
+    mc := calculator.Create(false) // false = verbose output
+    
+    // Execute calculation with automatic memory detection
+    result, err := mc.Execute()
+    if err != nil {
+        log.Fatalf("Calculation failed: %v", err)
+    }
+    
+    // Result contains JAVA_TOOL_OPTIONS
+    fmt.Printf("JVM Options: %s\n", result["JAVA_TOOL_OPTIONS"])
+}
+```
+
+### Advanced Configuration
+
+```go
+import (
+    "github.com/patbaumgartner/memory-calculator/internal/calc"
+    "github.com/patbaumgartner/memory-calculator/internal/memory"
+)
+
+// Direct calculator usage with custom configuration
+calculator := calc.Calculator{
+    TotalMemory:      memory.SizeFromString("4G"),
+    ThreadCount:      300,
+    LoadedClassCount: 50000,
+    HeadRoom:         10, // 10% safety margin
+}
+
+regions, err := calculator.Calculate("-XX:MaxMetaspaceSize=512m")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Access individual memory regions
+fmt.Printf("Heap: %s\n", regions.Heap)
+fmt.Printf("Metaspace: %s\n", regions.Metaspace)
+fmt.Printf("Thread Stacks: %s\n", regions.Stack)
+```
+
+## 📦 Package Overview
+
+### Architecture
 
 ```
 memory-calculator/
-├── cmd/memory-calculator/     # CLI entry point
-├── internal/
-│   ├── calc/                 # Core memory calculation algorithms
-│   ├── config/              # Configuration management and validation
-│   ├── display/             # Output formatting and JVM flag generation
-│   ├── memory/              # Memory parsing and unit conversion
-│   ├── cgroups/             # Container memory detection (cgroups v1/v2)
-│   ├── host/                # Host system memory detection
-│   └── count/               # JAR scanning and class count estimation
-├── pkg/
-│   └── errors/              # Structured error types with context
-└── vendor/                  # Memory calculator library interface
+├── cmd/memory-calculator/       # CLI application entry point
+├── internal/                   # Private application packages
+│   ├── calc/                  # Core memory calculation algorithms
+│   ├── calculator/            # High-level calculator orchestration
+│   ├── cgroups/              # Container memory detection (cgroups v1/v2)
+│   ├── config/               # Configuration management and validation
+│   ├── constants/            # Memory unit constants and defaults
+│   ├── count/                # Class counting and JAR analysis
+│   ├── display/              # Output formatting and presentation
+│   ├── host/                 # Host system memory detection
+│   ├── logger/               # Structured logging utilities
+│   ├── memory/               # Memory parsing and unit conversion
+│   └── parser/               # String parsing utilities
+└── pkg/                      # Public packages
+    └── errors/               # Structured error types
 ```
 
-## Build Variants
+### Package Responsibilities
 
-The memory calculator supports **two build variants** optimized for different deployment scenarios:
+| Package | Purpose | Key Types |
+|---------|---------|-----------|
+| `calc` | Core memory calculation algorithms | `Calculator`, `MemoryRegions` |
+| `calculator` | High-level orchestration and integration | `MemoryCalculator` |
+| `cgroups` | Container memory limit detection | `Detector` |
+| `config` | Configuration management and validation | `Config` |
+| `constants` | Memory unit constants and defaults | Constants |
+| `count` | Class counting and JAR analysis | Class counting functions |
+| `display` | Output formatting and presentation | `Formatter` |
+| `host` | Host system memory detection | `Detector` |
+| `logger` | Structured logging | `Logger` |
+| `memory` | Memory parsing and unit conversion | `Size` |
+| `parser` | String parsing utilities | Parsing functions |
+| `errors` | Structured error handling | `MemoryCalculatorError` |
 
-### Standard Build
+## 🏗️ Build Variants
+
+The memory calculator supports **two optimized build variants** for different deployment scenarios:
+
+### Standard Build (Full Features)
+
 ```bash
 go build ./cmd/memory-calculator
+# OR
+make build
 ```
-- **Full feature set**: Complete regex-based JVM flag parsing
-- **ZIP/JAR processing**: Full archive parsing with dependency scanning
-- **Binary size**: ~2.4MB
-- **Dependencies**: Complete set including archive/zip, regexp, etc.
-- **Use case**: Development, full-featured deployments
 
-### Minimal Build
+**Features:**
+- Complete regex-based JVM flag parsing
+- Full ZIP/JAR archive processing with dependency scanning
+- Advanced class counting with metadata extraction
+- Binary size: ~2.4MB
+- Dependencies: Complete feature set including `archive/zip`, `regexp`
+
+**Use Cases:**
+- Development environments
+- Full-featured deployments
+- CI/CD pipelines with comprehensive analysis
+
+### Minimal Build (Size Optimized)
+
 ```bash
 go build -tags minimal ./cmd/memory-calculator
+# OR 
+make build-minimal
 ```
-- **Optimized size**: String-based parsing with size estimation
-- **Reduced dependencies**: Eliminates archive/zip processing
-- **Binary size**: ~2.2MB (37% smaller than original)
-- **Use case**: Container deployments, resource-constrained environments
+
+**Features:**
+- String-based parsing (no regex dependency)
+- Size-based class estimation (no ZIP processing)
+- Reduced binary size: ~2.2MB (8% smaller)
+- Minimal dependencies: eliminates `archive/zip` processing
+
+**Use Cases:**
+- Container deployments
+- Resource-constrained environments
+- Embedded systems and edge computing
 
 ### Build Constraint Implementation
 
-The build variants use Go build constraints to conditionally compile code:
-
 ```go
 //go:build !minimal
-// Standard implementation with full features
+// +build !minimal
+// Standard implementation - full features
+func matchHeap(s string) bool {
+    return HeapPattern.MatchString(s)
+}
 
-//go:build minimal  
-// Minimal implementation with size optimization
+//go:build minimal
+// +build minimal  
+// Minimal implementation - string matching
+func matchHeap(s string) bool {
+    return strings.HasPrefix(s, "-Xmx")
+}
 ```
 
-**Both variants produce identical functionality and output**, ensuring seamless deployment flexibility.
+**Important:** Both variants produce **identical output and functionality**, ensuring seamless deployment flexibility.
 
-## Core API
+## 🧮 Core Calculation API
 
 ### Calculator Interface
 
-The primary interface for memory calculations is provided by the `calc.Calculator` struct:
+The primary calculation engine implementing sophisticated JVM memory allocation algorithms:
 
 ```go
 package calc
 
-// Calculator represents the core JVM memory calculation engine
+// Calculator performs JVM memory allocation calculations
 type Calculator struct {
-    HeadRoom         int    // Percentage of memory to reserve (0-99)
-    LoadedClassCount int    // Expected number of loaded classes
-    ThreadCount      int    // Number of application threads
-    TotalMemory      Size   // Total available memory
+    TotalMemory      Size  // Total available memory
+    ThreadCount      int   // Number of application threads  
+    LoadedClassCount int   // Expected loaded classes
+    HeadRoom         int   // Safety margin percentage (0-99)
 }
 
-// Calculate performs comprehensive JVM memory allocation calculations
+// Calculate performs comprehensive memory allocation
 func (c Calculator) Calculate(flags string) (MemoryRegions, error)
 ```
 
 ### Memory Regions
 
-The `MemoryRegions` struct represents the complete JVM memory allocation:
+Complete JVM memory allocation specification:
 
 ```go
 type MemoryRegions struct {
-    DirectMemory      Size  // Off-heap direct memory allocation
-    Heap              Size  // Main object heap memory
-    Metaspace         Size  // Class metadata storage
-    ReservedCodeCache Size  // JIT compilation code cache
-    Stack             Size  // Per-thread stack size
+    Heap              *Heap              // Main object storage
+    Metaspace         *Metaspace         // Class metadata storage  
+    Stack             Stack              // Per-thread stack allocation
+    DirectMemory      DirectMemory       // Off-heap NIO memory
+    ReservedCodeCache ReservedCodeCache  // JIT compilation cache
+    HeadRoom          *HeadRoom          // Safety margin reservation
 }
 
-// ToJVMArgs converts memory regions to JVM command line arguments
+// Convert to JVM command line arguments
 func (mr MemoryRegions) ToJVMArgs() []string
+
+// Calculate total allocated memory
+func (mr MemoryRegions) TotalSize() Size
+
+// Get allocation summary
+func (mr MemoryRegions) Summary() string
 ```
 
-### Memory Size API
+### Memory Allocation Algorithm
 
-The `memory` package provides flexible memory size handling:
+The calculator implements a sophisticated 7-step allocation process:
+
+```go
+// 1. Parse existing JVM flags for user overrides
+flags, err := parser.ParseJVMFlags(existingFlags)
+
+// 2. Calculate head room reservation (percentage-based)
+headRoom := totalMemory * (headRoomPercent / 100)
+availableMemory := totalMemory - headRoom
+
+// 3. Allocate thread stack memory (threads × stack size)
+stackMemory := threadCount * defaultStackSize // 1MB per thread
+
+// 4. Calculate metaspace requirements
+metaspaceMemory := (loadedClasses * classOverhead) + baseMetaspaceSize
+
+// 5. Reserve code cache for JIT compilation
+codeCacheMemory := 240 * MB // Optimized for performance
+
+// 6. Reserve direct memory for NIO operations  
+directMemory := 10 * MB // Conservative allocation
+
+// 7. Allocate remaining memory to heap
+heapMemory := availableMemory - stackMemory - metaspaceMemory - 
+              codeCacheMemory - directMemory
+```
+
+### Constants and Defaults
+
+```go
+const (
+    // Memory calculation constants
+    ClassSize         = 5_800         // Bytes per loaded class
+    ClassOverhead     = 14_000_000    // Base metaspace overhead
+    DefaultStackSize  = 1 * MB        // Per-thread stack size
+    DefaultCodeCache  = 240 * MB      // JIT compilation cache
+    DefaultDirectMem  = 10 * MB       // NIO operations
+    
+    // Memory unit constants
+    KB = 1024
+    MB = 1024 * KB  
+    GB = 1024 * MB
+    TB = 1024 * GB
+)
+```
+
+## 💾 Memory Management
+
+### Size Type and Operations
+
+Flexible memory size handling with unit conversion:
 
 ```go
 package memory
 
-// Size represents a memory value with unit conversion capabilities
-type Size int64
+// Size represents a memory value with provenance tracking
+type Size struct {
+    Value      int64      // Memory size in bytes
+    Provenance Provenance // Source of this value
+}
 
-// Parsing functions
-func ParseSize(s string) (Size, error)           // Parse memory string (e.g., "2G", "512M")
-func SizeFromBytes(bytes int64) Size             // Create from byte value
-func SizeFromString(s string) Size               // Parse with panic on error
+type Provenance int
+const (
+    Calculated     Provenance = iota // Calculated by algorithm
+    UserConfigured                   // Specified by user
+    DefaultValue                     // System default
+)
 
-// Conversion methods
-func (s Size) Bytes() int64                      // Convert to bytes
-func (s Size) String() string                    // Human-readable format
-func (s Size) ToJVMArg() string                  // JVM-compatible format
+// Creation functions
+func SizeFromBytes(bytes int64) Size
+func SizeFromString(s string) Size        // Panics on error
+func ParseSize(s string) (Size, error)    // Safe parsing
+
+// Conversion methods  
+func (s Size) Bytes() int64              // Raw byte value
+func (s Size) KB() float64               // Kilobytes  
+func (s Size) MB() float64               // Megabytes
+func (s Size) GB() float64               // Gigabytes
+func (s Size) String() string            // Human-readable (e.g., "2G")
+func (s Size) ToJVMArg() string         // JVM format (e.g., "2048m")
+
+// Arithmetic operations
+func (s Size) Add(other Size) Size
+func (s Size) Sub(other Size) Size  
+func (s Size) Mul(factor float64) Size
+func (s Size) Div(divisor float64) Size
+
+// Comparison operations
+func (s Size) LessThan(other Size) bool
+func (s Size) GreaterThan(other Size) bool
+func (s Size) Equals(other Size) bool
 ```
+
+### Memory Unit Parsing
+
+Supports flexible memory unit formats:
+
+```go
+// Supported formats
+sizes := []string{
+    "2G", "2GB", "2g", "2gb",           // Gigabytes
+    "512M", "512MB", "512m", "512mb",   // Megabytes  
+    "1024K", "1024KB", "1024k",         // Kilobytes
+    "2147483648B", "2147483648",        // Bytes
+    "1.5G", "512.5M",                   // Decimal values
+}
+
+for _, s := range sizes {
+    size, err := memory.ParseSize(s)
+    if err != nil {
+        log.Printf("Failed to parse %s: %v", s, err)
+        continue
+    }
+    fmt.Printf("%s = %d bytes\n", s, size.Bytes())
+}
+```
+
+---
+
+For complete examples and integration patterns, see the [examples directory](examples/) and [integration tests](integration_test.go).
+
+## 🔗 Related Documentation
+
+- [Architecture Overview](ARCHITECTURE.md) - System design and architecture
+- [Project Setup](PROJECT_SETUP.md) - Development and build information
+- [Usage Guide](USAGE_GUIDE.md) - Detailed usage examples
+- [Test Documentation](TEST_DOCUMENTATION.md) - Testing framework and coverage
 
 ## Configuration
 
@@ -163,11 +379,10 @@ Configuration can also be provided via environment variables:
 ```go
 // Supported environment variables
 const (
-    EnvTotalMemory      = "MEMORY_CALCULATOR_TOTAL_MEMORY"
-    EnvThreadCount      = "MEMORY_CALCULATOR_THREAD_COUNT"
-    EnvLoadedClassCount = "MEMORY_CALCULATOR_LOADED_CLASS_COUNT"
-    EnvHeadRoom         = "MEMORY_CALCULATOR_HEAD_ROOM"
-    EnvQuiet            = "MEMORY_CALCULATOR_QUIET"
+    EnvTotalMemory      = "BPL_JVM_TOTAL_MEMORY"
+    EnvThreadCount      = "BPL_JVM_THREAD_COUNT"
+    EnvLoadedClassCount = "BPL_JVM_LOADED_CLASS_COUNT"
+    EnvHeadRoom         = "BPL_JVM_HEAD_ROOM"
 )
 ```
 

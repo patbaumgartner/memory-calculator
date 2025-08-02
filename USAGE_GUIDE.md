@@ -113,7 +113,7 @@ set_java_memory() {
 
 ### Single-Stage Dockerfile
 ```dockerfile
-FROM openjdk:17-jre
+FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl
 
 # Copy your application
 COPY myapp.jar /app/myapp.jar
@@ -132,13 +132,13 @@ ENTRYPOINT ["/startup.sh"]
 ### Multi-Stage Build
 ```dockerfile
 # Build stage - compile memory calculator
-FROM golang:1.21 as calculator-builder
+FROM golang:1.24.5 as calculator-builder
 WORKDIR /build
 COPY . .
 RUN make build-minimal
 
 # Runtime stage
-FROM openjdk:17-jre-slim
+FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl
 WORKDIR /app
 
 # Copy calculator and application

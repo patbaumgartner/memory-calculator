@@ -13,12 +13,16 @@ cmd/memory-calculator/          # Main application entry point
 pkg/errors/                     # Public structured error types  
 internal/
 ├── calc/                      # Memory calculations with build constraints
-├── config/                    # Configuration management
-├── count/                     # Class counting with build variants
-├── memory/                    # Memory parsing & formatting
+├── calculator/                # Memory calculator
 ├── cgroups/                   # Container memory detection
+├── config/                    # Configuration management
+├── constants/                 # Memory unit constants
+├── count/                     # Class counting with build variants
+├── display/                   # Output formatting
 ├── host/                      # Host memory detection
-└── display/                   # Output formatting
+├── logger/                    # Logging utilities
+├── memory/                    # Memory parsing & formatting
+└── parser/                    # Memory string parsing
 ```
 
 ### Build Constraint Testing

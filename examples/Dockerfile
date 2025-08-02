@@ -8,7 +8,7 @@ COPY . .
 RUN apk add --no-cache make && make build-minimal
 
 # Runtime image
-FROM openjdk:17-jre-alpine
+FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl
 WORKDIR /app
 
 # Install memory calculator

@@ -1,10 +1,22 @@
-# Project Setup Summary
+# Project Setup Guide
 
-This document summarizes the complete project setup for the JVM Memory Calculator with **build constraint support** for optimized deployment scenarios.
+Development environment setup and build information for contributors.
 
-## 📁 Project Structure
+## 🚀 Quick Start
 
+```bash
+git clone <repo> && cd memory-calculator
+make tools deps test build
 ```
+
+## 📋 Prerequisites
+
+- **Go 1.21+**, **Make**, **Git**
+- **Docker** (optional) - For container testing
+- **UPX** (optional) - For compressed builds (`apt install upx-ucl` or `brew install upx`)
+
+## 🛠️ Development Commands
+
 ```
 memory-calculator/
 ├── .github/                   # GitHub-specific configuration
@@ -38,19 +50,39 @@ memory-calculator/
 │   └── memory/              # Memory parsing logic
 ├── pkg/                     # Public packages
 │   └── errors/              # Structured error handling
+├── examples/                 # Usage examples and scripts
+│   ├── docker-entrypoint.sh # Docker container entry script
+│   ├── Dockerfile           # Example Dockerfile
+│   ├── kubernetes.yaml      # Kubernetes deployment example
+│   ├── README.md            # Examples documentation
+│   ├── set-java-options.sh  # Java options configuration script
+│   └── simple-startup.sh    # Simple startup script
+├── testdata/                # Test data and fixtures
+│   └── app/                 # Test application files
+│       ├── mock.jar         # Mock JAR file for testing
+│       └── test.jar         # Test JAR file
 ├── coverage/                # Test coverage reports (generated)
 ├── dist/                   # Build artifacts (generated)
 ├── .gitignore              # Git ignore patterns
+├── .golangci.yml           # Go linter configuration
 ├── .vscode/                # VS Code settings (optional)
+├── API.md                  # API documentation
+├── ARCHITECTURE.md         # Architecture documentation
+├── BINARY_OPTIMIZATION.md  # Binary optimization guide
+├── CHANGELOG.md            # Version changelog
 ├── CONTRIBUTING.md         # Contribution guidelines
 ├── Dockerfile              # Container build instructions
 ├── LICENSE                 # MIT License
 ├── Makefile                # Build automation
+├── PROJECT_SETUP.md        # This file - project setup guide
 ├── README.md               # Main project documentation
+├── SECURITY.md             # Security policy and guidelines
+├── TEST_COVERAGE.md        # Test coverage documentation
 ├── TEST_DOCUMENTATION.md   # Test documentation
+├── USAGE_GUIDE.md          # Detailed usage guide
 ├── go.mod                  # Go module definition
 ├── go.sum                  # Go module checksums
-├── *_test.go               # Test files
+├── integration_test.go     # Integration tests
 └── memory-calculator       # Built binary (generated)
 ```
 ```
@@ -58,19 +90,51 @@ memory-calculator/
 ## 🛠️ Development Tools
 
 ### Makefile Commands
-- `make build` - Build standard variant for current platform
-- `make build-minimal` - Build minimal variant (37% smaller)
-- `make build-all` - Build both variants for all supported platforms
+
+The project includes a comprehensive Makefile with the following targets:
+
+#### Build Commands
+- `make build` - Build binary for current platform
+- `make build-all` - Build binaries for all platforms
+- `make build-minimal` - Build minimal binary without optional features
 - `make build-compressed` - Build ultra-compressed binary (requires UPX)
-- `make build-size-comparison` - Compare optimized vs unoptimized binary sizes
-- `make test` - Run all tests (including build constraint tests)
-- `make test-variants` - Test both build variants explicitly
-- `make coverage` - Run tests with coverage
+- `make build-size-comparison` - Compare binary sizes with and without optimization
+- `make build-ultimate-comparison` - Compare all build variants (standard, minimal, compressed)
+
+#### Test Commands
+- `make test` - Run all tests
+- `make integration` - Run integration tests only
+- `make test-all` - Run all tests including integration tests
+- `make test-coverage` - Run tests with coverage
+- `make coverage` - Run tests with coverage (alias for test-coverage)
 - `make coverage-html` - Generate HTML coverage report
-- `make quality` - Run comprehensive quality checks (format, lint, security, vulnerabilities)
-- `make tools` - Install all development tools
+- `make benchmark` - Run benchmarks
+- `make benchmark-compare` - Run benchmarks and save results for comparison
+
+#### Quality Commands
+- `make quality` - Run all quality checks (format, lint, security, vulnerabilities)
+- `make format` - Format Go code
+- `make lint` - Run linter (requires golangci-lint)
+- `make security` - Run security checks
+- `make vuln-check` - Check for known vulnerabilities
+
+#### Development Commands
+- `make deps` - Download dependencies
+- `make tools` - Install all required development tools
 - `make tools-check` - Check if all tools are available
 - `make clean` - Clean build artifacts
+- `make dev` - Run in development mode
+- `make dev-test` - Run with test parameters
+- `make install` - Install binary to GOPATH/bin
+
+#### Docker Commands
+- `make docker-build` - Build Docker image
+- `make docker-run` - Run Docker container
+- `make docker-test` - Test Docker container with memory limit
+
+#### Release Commands
+- `make release-check` - Check if ready for release
+- `make all` - Build everything (clean, deps, test, build)
 - `make help` - Show all available commands
 
 ### Build Variants
@@ -107,12 +171,10 @@ The project uses **aggressive optimization flags** and **build constraints** to 
 2. **Strip Debug Information**: `-ldflags="-s -w"`
    - `-s`: Removes symbol table and debug info
    - `-w`: Removes DWARF debug information
-
-2. **Reproducible Builds**: `-trimpath`
+3. **Reproducible Builds**: `-trimpath`
    - Removes file system paths from the executable
    - Ensures consistent builds across environments
-
-3. **Force Clean Rebuilds**: `-a`
+4. **Force Clean Rebuilds**: `-a`
    - Forces rebuilding of all packages
    - Ensures optimal linking
 
@@ -217,7 +279,7 @@ docker run --rm memory-calculator --help
 
 ## 🧪 Testing Framework
 
-### Test Coverage: 77.1%
+### Test Coverage: 77.5%
 The codebase has been refactored with a professional package structure providing excellent test coverage:
 
 - **Unit Tests**: Per-package testing with dependency injection
@@ -227,11 +289,18 @@ The codebase has been refactored with a professional package structure providing
 
 ### Test Architecture by Package
 - `integration_test.go` - End-to-end application testing
-- `internal/memory/parser_test.go` - Memory parsing and formatting (95.7% coverage)
-- `internal/cgroups/detector_test.go` - Container detection (94.6% coverage)
-- `internal/display/formatter_test.go` - Output formatting (100% coverage)
-- `internal/config/config_test.go` - Configuration management (100% coverage)
-- `pkg/errors/errors_test.go` - Structured error handling (100% coverage)
+- `internal/calc/*_test.go` - Core calculation and build constraint tests
+- `internal/calculator/*_test.go` - Calculator orchestration tests
+- `internal/cgroups/*_test.go` - Container memory detection tests (94.6% coverage)
+- `internal/config/*_test.go` - Configuration management tests (100% coverage)
+- `internal/constants/*_test.go` - Constants and validation tests
+- `internal/count/*_test.go` - Class counting and minimal build tests
+- `internal/display/*_test.go` - Output formatting tests (100% coverage)
+- `internal/host/*_test.go` - Host memory detection tests
+- `internal/logger/*_test.go` - Logging utilities tests
+- `internal/memory/*_test.go` - Memory parsing tests (95.7% coverage)
+- `internal/parser/*_test.go` - Flag parsing tests (100% coverage)
+- `pkg/errors/*_test.go` - Structured error handling tests (100% coverage)
 
 ### Package Coverage Summary
 | Package | Coverage | Status |
@@ -239,13 +308,15 @@ The codebase has been refactored with a professional package structure providing
 | `pkg/errors` | 100% | ✅ Complete |
 | `internal/config` | 100% | ✅ Complete |
 | `internal/display` | 100% | ✅ Complete |
+| `internal/parser` | 100% | ✅ Complete |
 | `internal/memory` | 95.7% | ✅ Excellent |
 | `internal/cgroups` | 94.6% | ✅ Excellent |
+| **Total Coverage** | **77.5%** | ✅ **Good** |
 
 ## 📦 Dependencies
 
 ### Direct Dependencies
-- `github.com/paketo-buildpacks/libjvm` - JVM memory calculation engine
+- The project has no external dependencies beyond the Go standard library.
 
 ### Build Dependencies
 All transitive dependencies managed automatically by Go modules.
@@ -352,18 +423,28 @@ Examples:
 
 ## 📝 Documentation
 
+The project includes comprehensive documentation:
+
 - **README.md** - Complete user and developer guide
 - **CONTRIBUTING.md** - Contribution guidelines and workflow
+- **PROJECT_SETUP.md** - This file - project setup and development guide
 - **TEST_DOCUMENTATION.md** - Test framework documentation
+- **TEST_COVERAGE.md** - Test coverage documentation
+- **USAGE_GUIDE.md** - Detailed usage guide and examples
+- **API.md** - API documentation and reference
+- **ARCHITECTURE.md** - Architecture documentation and design decisions
+- **BINARY_OPTIMIZATION.md** - Binary optimization guide and techniques
+- **SECURITY.md** - Security policy and guidelines
+- **CHANGELOG.md** - Version changelog and release notes
 - **Inline Documentation** - Godoc-style code comments
-- **Usage Examples** - Multiple integration scenarios
+- **Usage Examples** - Multiple integration scenarios in `examples/`
 
 ## 🎯 Project Status
 
 **✅ Complete and Production Ready**
 
 The JVM Memory Calculator is fully functional with:
-- Comprehensive test suite (75.2% coverage with professional package structure)
+- Comprehensive test suite (77.5% coverage with professional package structure)
 - Automated CI/CD pipeline
 - Cross-platform build support
 - Professional documentation

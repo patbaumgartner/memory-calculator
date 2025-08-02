@@ -148,7 +148,7 @@ COPY . /build
 WORKDIR /build
 RUN make build-minimal
 
-FROM openjdk:17-jre
+FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl
 COPY --from=calculator /build/memory-calculator /usr/local/bin/
 
 # Set JVM options at runtime
@@ -160,7 +160,7 @@ CMD ["java", "-jar", "app.jar"]
 
 ```dockerfile
 # Method 2: Runtime calculation
-FROM openjdk:17-jre
+FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl
 COPY memory-calculator /usr/local/bin/
 COPY app.jar /app.jar
 
@@ -258,10 +258,12 @@ All memory values support flexible units with decimal precision:
 Configure the calculator using environment variables:
 
 ```bash
-export MEMORY_CALCULATOR_TOTAL_MEMORY="2G"
-export MEMORY_CALCULATOR_THREAD_COUNT="300"
-export MEMORY_CALCULATOR_HEAD_ROOM="10"
-export MEMORY_CALCULATOR_QUIET="true"
+export BPL_JVM_TOTAL_MEMORY="2G"
+export BPL_JVM_THREAD_COUNT="300"
+export BPL_JVM_HEAD_ROOM="10"
+
+export BPI_APPLICATION_PATH="/app"
+export BPI_JVM_CLASS_COUNT="10000"
 ```
 
 ## 🏗️ Architecture
@@ -274,17 +276,17 @@ The calculator uses a sophisticated multi-step algorithm:
 ┌─────────────────────────────────────┐
 │           Total Memory              │
 ├─────────────────────────────────────┤
-│ 1. Head Room (configurable %)      │
+│ 1. Head Room (configurable %)       │
 ├─────────────────────────────────────┤
-│ 2. Thread Stacks (threads × 1MB)   │
+│ 2. Thread Stacks (threads × 1MB)    │
 ├─────────────────────────────────────┤
-│ 3. Metaspace (classes × 8KB)       │
+│ 3. Metaspace (classes × 8KB)        │
 ├─────────────────────────────────────┤
-│ 4. Code Cache (240MB for JIT)      │
+│ 4. Code Cache (240MB for JIT)       │
 ├─────────────────────────────────────┤
-│ 5. Direct Memory (10MB for NIO)    │
+│ 5. Direct Memory (10MB for NIO)     │
 ├─────────────────────────────────────┤
-│ 6. Heap (remaining memory)         │
+│ 6. Heap (remaining memory)          │
 └─────────────────────────────────────┘
 ```
 
@@ -307,156 +309,55 @@ When not specified, the calculator estimates loaded classes by:
 
 ## 🔧 Integration
 
-### Paketo Buildpacks
+### Quick Integration Examples
 
-Seamless integration with cloud-native buildpacks:
-
+**Shell Script:**
 ```bash
-# Buildpack environment
-export BP_JVM_VERSION=21
-export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)"
-
-# Custom buildpack configuration
-cat > buildpack.yml << EOF
----
-java:
-  jvm:
-    memory-calculator:
-      stack-threads: 300
-      head-room: 5
-EOF
+export JAVA_TOOL_OPTIONS="$(./memory-calculator --total-memory=2G --quiet)"
+java -jar myapp.jar
 ```
 
-### Docker
-
+**Docker:**
 ```dockerfile
-FROM paketobuildpacks/builder-jammy-base:latest
-
-# Add memory calculator
 COPY memory-calculator /usr/local/bin/
-RUN chmod +x /usr/local/bin/memory-calculator
-
-# Configure JVM at runtime
-ENV JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)"
+CMD export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)" && java -jar app.jar
 ```
 
-### Kubernetes
-
+**Kubernetes:**
 ```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: java-app
-spec:
-  template:
-    spec:
-      containers:
-      - name: app
-        image: my-java-app:latest
-        resources:
-          limits:
-            memory: "2Gi"
-          requests:  
-            memory: "1Gi"
-        env:
-        - name: JAVA_TOOL_OPTIONS
-          value: "$(memory-calculator --total-memory 2G --quiet)"
+env:
+- name: JAVA_TOOL_OPTIONS
+  value: "$(memory-calculator --total-memory 2G --quiet)"
 ```
 
-### Spring Boot
-
-```properties
-# application.properties
-spring.application.name=my-app
-
-# Runtime JVM configuration via memory calculator
-# JAVA_TOOL_OPTIONS automatically applied
-```
+*For complete integration examples, see [USAGE_GUIDE.md](USAGE_GUIDE.md) and [examples/](examples/)*
 
 ## 🚦 Advanced Usage
 
-### High-Performance Applications
-
+**High-Performance Applications:**
 ```bash
-# Large heap with many threads
-./memory-calculator \
-  --total-memory 16G \
-  --thread-count 1000 \
-  --loaded-class-count 100000 \
-  --head-room 5
-
-# Output: Optimized for high-throughput scenarios
+./memory-calculator --total-memory 16G --thread-count 1000 --loaded-class-count 100000 --head-room 5
 ```
 
-### Microservices
-
+**Microservices:**
 ```bash  
-# Minimal memory footprint
-./memory-calculator \
-  --total-memory 512M \
-  --thread-count 50 \
-  --head-room 10
-
-# Output: Conservative settings for resource-constrained environments
+./memory-calculator --total-memory 512M --thread-count 50 --head-room 10
 ```
 
-### CI/CD Pipeline Integration
-
+**CI/CD Integration:**
 ```bash
-#!/bin/bash
-# deployment-script.sh
-
-set -euo pipefail
-
-# Detect container memory limit
 MEMORY_LIMIT=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo "2G")
-
-# Calculate optimal JVM settings
-JVM_OPTS=$(./memory-calculator --total-memory "$MEMORY_LIMIT" --quiet)
-
-# Export for application startup
-export JAVA_TOOL_OPTIONS="$JVM_OPTS"
-
-# Start application
-exec java -jar app.jar
+export JAVA_TOOL_OPTIONS="$(./memory-calculator --total-memory "$MEMORY_LIMIT" --quiet)"
 ```
 
 ## 📊 Performance & Testing
 
-### Benchmarks
+- **Execution**: < 1ms calculation time
+- **JAR Scanning**: ~100MB/s throughput  
+- **Test Coverage**: 77.1%+ with comprehensive edge cases
+- **Build Variants**: Standard (2.4MB) vs Minimal (2.2MB)
 
-- **Memory Calculation**: < 1ms execution time
-- **JAR Scanning**: ~100MB/s throughput
-- **Container Detection**: < 0.1ms system call overhead
-
-### Test Coverage
-
-| Package | Coverage | Description |
-|---------|----------|-------------|
-| `calc` | 83.9% | Core calculation algorithms |
-| `count` | 66.2% | JAR/class counting logic |
-| `config` | 100% | Configuration parsing |
-| `display` | 100% | Output formatting |
-| `errors` | 100% | Error handling |
-| `memory` | 98.2% | Memory parsing utilities |
-| `cgroups` | 95.1% | Container detection |
-| `host` | 79.4% | Host system detection |
-
-### Running Tests
-
-```bash
-# All tests with coverage
-make test-coverage
-
-# Integration tests
-make test-integration
-
-# Benchmark tests
-make benchmark
-
-# Generate coverage report
-make coverage-html
-```
+Run tests: `make test` | Coverage: `make coverage` | Benchmarks: `make benchmark`
 
 ## 🛠️ Development
 
@@ -519,18 +420,15 @@ make tools-check        # Verify tools are available
 make help               # Show all available targets
 ```
 
-## 📖 Additional Documentation
+## 📖 Documentation
 
-### Comprehensive Guides
-- **[USAGE_GUIDE.md](USAGE_GUIDE.md)** - Complete integration patterns and troubleshooting
-- **[examples/](examples/)** - Ready-to-use scripts for Docker, Kubernetes, and more
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development and contribution guidelines
-- **[SECURITY.md](SECURITY.md)** - Security policy and vulnerability reporting
+For complete documentation, see **[DOCS_INDEX.md](DOCS_INDEX.md)** - your guide to all project documentation.
 
-### Quick References
-- **[examples/set-java-options.sh](examples/set-java-options.sh)** - Helper script for interactive development
-- **[Makefile](Makefile)** - All build targets and development commands
-- **[PROJECT_SETUP.md](PROJECT_SETUP.md)** - Development environment setup
+### Quick Links
+- **[USAGE_GUIDE.md](USAGE_GUIDE.md)** - Integration patterns and troubleshooting
+- **[API.md](API.md)** - Complete API reference
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - Development guidelines
+- **[examples/](examples/)** - Ready-to-use integration examples
 
 ### Integration Examples
 | Scenario | File | Description |
@@ -578,7 +476,7 @@ Follow conventional commit format:
 - `test:` test additions/changes
 - `refactor:` code refactoring
 
-## � Security
+## 🛡️ Security
 
 Please review our [Security Policy](SECURITY.md) for reporting vulnerabilities.
 
@@ -586,13 +484,14 @@ Please review our [Security Policy](SECURITY.md) for reporting vulnerabilities.
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## � Changelog
+## 📜 Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for version history and release notes.
 
 ## 🙏 Acknowledgments
 
 - [Paketo Buildpacks](https://paketo.io/) for the libjvm helper library
+- [Java Memory Calculator](https://paketo.io/docs/reference/java-reference/#memory-calculator) for memory calculation logic
 - [Temurin](https://adoptium.net/) and [Liberica](https://bell-sw.com/) JDK teams
 - Contributors and the Go community
 
