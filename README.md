@@ -18,8 +18,8 @@ A production-ready JVM memory calculator that automatically detects container me
 - 🤫 **Quiet Mode**: Clean output for scripting and automation (`--quiet` flag)
 - 🧪 **Production Tested**: Comprehensive test coverage (77.1%+) with edge case handling
 - ⚡ **High Performance**: Optimized algorithms for class counting and memory calculation
-- � **Size Optimized**: Multiple build variants (37% size reduction for container deployments)
-- �🛡️ **Robust Error Handling**: Graceful degradation with detailed error reporting
+- 📦 **Size Optimized**: Multiple build variants (37% size reduction for container deployments)
+- 🛡️ **Robust Error Handling**: Graceful degradation with detailed error reporting
 
 ## 📋 Quick Start
 
