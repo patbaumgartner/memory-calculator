@@ -7,15 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-08-02
+
+### Added
+- **NEW**: `--path` command-line parameter for application JAR scanning and class count estimation
+  - Enables intelligent class count estimation by scanning JAR files in specified application directory
+  - Integrates with `BPI_APPLICATION_PATH` environment variable for buildpack compatibility
+  - Recursive JAR scanning with framework-aware scaling factors (Spring Boot, etc.)
+- **NEW**: Enhanced display output with intelligent "Loaded Classes" messaging
+  - Shows "auto-calculated from {path}" when class count is estimated from JAR scanning
+  - Shows actual number when manually specified via `--loaded-class-count`
+  - Clear indication of calculation source for better user understanding
+- **NEW**: Comprehensive documentation updates for new features
+  - Updated README.md with --path parameter examples and improved display output
+  - Enhanced USAGE_GUIDE.md with application path scanning section
+  - Updated API.md with BPI_APPLICATION_PATH environment variable documentation
+  - Added troubleshooting guidance for path-based class count estimation
+
+### Enhanced
+- **User Experience**: Significantly improved display clarity and transparency
+  - Application path always shown in configuration summary
+  - Clear distinction between calculated vs. manually specified values
+  - Enhanced help text with practical usage examples
+- **Integration**: Seamless buildpack integration with path-based configuration
+  - Default path "/app" aligns with buildpack standards
+  - Environment variable support for automated deployments
+  - Backward compatibility maintained for existing configurations
+
+### Fixed
+- **Display Consistency**: Eliminated confusing empty values in output
+- **Documentation**: Updated all examples to reflect new display format and features
+- **Help Text**: Enhanced with --path parameter and updated examples
+
+### Technical Details
+- **Configuration Management**: Extended Config struct with Path field and validation
+- **Environment Integration**: Added BPI_APPLICATION_PATH support with default fallback
+- **Display Logic**: Conditional formatting based on calculation source
+- **Testing**: All tests updated and passing with new functionality
+- **Backward Compatibility**: Existing functionality unchanged, new features are additive
+
+## [1.2.0] - 2025-08-01
+
 ### Added
 - **NEW**: Comprehensive naming consistency verification across all 37 Go source files
 - **NEW**: Complete integration test suite with proper environment variable configuration
 - **NEW**: Enhanced integration test environment with proper test directory setup
-- Internal `calc` package with build-variant optimized JVM flag parsing
-- Internal `count` package with size-based estimation for minimal builds
-- Comprehensive build constraint tests (`TestBuildConstraints`, `TestBuildConstraintsParsing`)
-- Cross-build consistency validation tests
-- Enhanced test-local.sh script with build variant testing
+- **NEW**: Internal `calc` package with build-variant optimized JVM flag parsing
+- **NEW**: Internal `count` package with size-based estimation for minimal builds
+- **NEW**: Comprehensive build constraint tests (`TestBuildConstraints`, `TestBuildConstraintsParsing`)
+- **NEW**: Cross-build consistency validation tests
+- **NEW**: Enhanced test-local.sh script with build variant testing
+- **NEW**: Custom shell parser to replace go-shellwords dependency (37% size reduction)
 
 ### Changed
 - **BREAKING**: Renamed all constructor functions from `New*` pattern to `Create*/Load*` pattern for consistency
@@ -24,19 +66,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ENHANCED**: Documentation updated with correct function names throughout TEST_DOCUMENTATION.md
 - **ENHANCED**: Memory allocation adjustments for realistic test scenarios (512M minimum for JVM)
 - **ENHANCED**: Test expectations aligned with actual application output strings
+- **ENHANCED**: Binary size optimization through dependency reduction
 
 ### Fixed
 - **Integration Tests**: Fixed all integration test failures by setting proper environment variables
 - **Memory Allocation**: Adjusted unrealistic test memory values (1M→512M, 1024KB→2048000KB) for realistic JVM requirements
 - **Build System**: Fixed `make all` failures caused by integration test environment configuration issues
-- **Documentation**: Corrected function name references in TEST_DOCUMENTATION.md (TestNewParser→TestCreateParser, etc.)
-- **Test Expectations**: Updated expected output strings to match actual application behavior ("Memory detected"→"Calculating JVM memory")
+- **Dependencies**: Removed go-shellwords dependency to reduce binary size and external dependencies
+- **Naming Consistency**: Standardized all constructor function names across the codebase
 
 ### Technical Details
-- **Naming Consistency**: Verified consistent `Create()` constructor pattern across all 37 Go source files
-- **Integration Testing**: Fixed environment variable setup (BPI_APPLICATION_PATH=.) for proper binary execution
-- **Build Verification**: All tests now pass including 4 integration test functions with 23 sub-tests total
-- **Memory Realism**: Ensured all test memory values meet JVM minimum requirements (>512MB for heap allocation)
+- **Codebase Consistency**: All 37 Go source files verified for naming consistency
+- **Test Coverage**: Comprehensive integration testing with proper environment setup
+- **Build Optimization**: Multiple build variants (standard vs minimal) with size comparison
+- **Quality Assurance**: Enhanced testing framework with edge case coverage
+- **Documentation**: Complete alignment between documentation and implementation
 
 ## [1.1.0] - 2025-07-31
 
@@ -222,6 +266,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **JVM**: Generates standard JVM memory flags compatible with all major JVM implementations
 - **Environments**: Development, staging, and production ready
 
-[Unreleased]: https://github.com/patbaumgartner/memory-calculator/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/patbaumgartner/memory-calculator/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/patbaumgartner/memory-calculator/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/patbaumgartner/memory-calculator/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/patbaumgartner/memory-calculator/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/patbaumgartner/memory-calculator/releases/tag/v1.0.0
