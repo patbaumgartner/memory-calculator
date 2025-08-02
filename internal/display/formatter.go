@@ -29,8 +29,16 @@ func (f *Formatter) DisplayResults(props map[string]string, totalMemory int64, c
 
 	fmt.Printf("Total Memory:     %s\n", f.parser.FormatMemory(totalMemory))
 	fmt.Printf("Thread Count:     %s\n", cfg.ThreadCount)
-	fmt.Printf("Loaded Classes:   %s\n", cfg.LoadedClassCount)
+
+	// Show loaded classes with helpful message if not set
+	if cfg.LoadedClassCount != "" {
+		fmt.Printf("Loaded Classes:   %s\n", cfg.LoadedClassCount)
+	} else {
+		fmt.Printf("Loaded Classes:   auto-calculated from %s\n", cfg.Path)
+	}
+
 	fmt.Printf("Head Room:        %s%%\n", cfg.HeadRoom)
+	fmt.Printf("Application Path: %s\n", cfg.Path)
 
 	fmt.Println("\nCalculated JVM Arguments:")
 	fmt.Println(strings.Repeat("-", 30))
@@ -81,6 +89,7 @@ func (f *Formatter) DisplayHelp(cfg *config.Config) {
 	fmt.Println("  --thread-count string         JVM thread count (default \"250\")")
 	fmt.Println("  --loaded-class-count string   JVM loaded class count (calculated if not set)")
 	fmt.Println("  --head-room string            JVM head room percentage (default \"0\")")
+	fmt.Println("  --path string                 Application path for JAR scanning (default \"/app\")")
 	fmt.Println("  --quiet                       Only output JVM parameters, no formatting")
 	fmt.Println("  --version                     Show version information")
 	fmt.Println("  --help                        Show this help message")
@@ -90,7 +99,7 @@ func (f *Formatter) DisplayHelp(cfg *config.Config) {
 	fmt.Println("  memory-calculator --thread-count=300 --head-room=10")
 	fmt.Println("  memory-calculator --total-memory=2G")
 	fmt.Println("  memory-calculator --total-memory=512M")
-	fmt.Println("  memory-calculator --total-memory=2147483648")
+	fmt.Println("  memory-calculator --path=/my/app --total-memory=2G")
 	fmt.Println("  memory-calculator --quiet --total-memory=2G  # Only output JVM parameters")
 }
 

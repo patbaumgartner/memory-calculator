@@ -15,6 +15,7 @@ type Config struct {
 	ThreadCount      string
 	LoadedClassCount string
 	HeadRoom         string
+	Path             string
 
 	// Output configuration
 	Quiet   bool
@@ -33,6 +34,7 @@ func Load() *Config {
 		ThreadCount:      getEnvOrDefault("BPL_JVM_THREAD_COUNT", "250"),
 		LoadedClassCount: os.Getenv("BPL_JVM_LOADED_CLASS_COUNT"), // No default - should be calculated
 		HeadRoom:         getEnvOrDefault("BPL_JVM_HEAD_ROOM", "0"),
+		Path:             getEnvOrDefault("BPI_APPLICATION_PATH", "/app"),
 		BuildVersion:     "dev",
 		BuildTime:        "unknown",
 		CommitHash:       "unknown",
@@ -58,6 +60,11 @@ func (c *Config) Validate() error {
 		return errors.NewConfigurationError("head-room", c.HeadRoom, "must be an integer between 0 and 100")
 	}
 
+	// Validate path (basic validation - path should not be empty)
+	if c.Path == "" {
+		return errors.NewConfigurationError("path", c.Path, "application path cannot be empty")
+	}
+
 	return nil
 }
 
@@ -68,6 +75,9 @@ func (c *Config) SetEnvironmentVariables() {
 		_ = os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", c.LoadedClassCount)
 	}
 	_ = os.Setenv("BPL_JVM_HEAD_ROOM", c.HeadRoom)
+	if c.Path != "" {
+		_ = os.Setenv("BPI_APPLICATION_PATH", c.Path)
+	}
 }
 
 // SetTotalMemory sets the total memory environment variable if memory is specified.

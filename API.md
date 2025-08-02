@@ -361,7 +361,7 @@ type Config struct {
     ThreadCount      int     // Number of threads
     LoadedClassCount int     // Number of loaded classes  
     HeadRoom         int     // Head room percentage
-    Path             string  // Path for JAR scanning
+    Path             string  // Path for JAR scanning and class counting
     Quiet            bool    // Quiet output mode
 }
 
@@ -383,6 +383,7 @@ const (
     EnvThreadCount      = "BPL_JVM_THREAD_COUNT"
     EnvLoadedClassCount = "BPL_JVM_LOADED_CLASS_COUNT"
     EnvHeadRoom         = "BPL_JVM_HEAD_ROOM"
+    EnvApplicationPath  = "BPI_APPLICATION_PATH"
 )
 ```
 

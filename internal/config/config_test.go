@@ -11,6 +11,7 @@ func TestLoad(t *testing.T) {
 	os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
 	os.Unsetenv("BPL_JVM_THREAD_COUNT")
 	os.Unsetenv("BPL_JVM_HEAD_ROOM")
+	os.Unsetenv("BPI_APPLICATION_PATH")
 
 	cfg := Load()
 
@@ -27,6 +28,10 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Expected head room '0', got '%s'", cfg.HeadRoom)
 	}
 
+	if cfg.Path != "/app" {
+		t.Errorf("Expected path '/app', got '%s'", cfg.Path)
+	}
+
 	if cfg.BuildVersion != "dev" {
 		t.Errorf("Expected build version 'dev', got '%s'", cfg.BuildVersion)
 	}
@@ -37,11 +42,13 @@ func TestLoadWithEnvironmentVariables(t *testing.T) {
 	os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "15000")
 	os.Setenv("BPL_JVM_THREAD_COUNT", "500")
 	os.Setenv("BPL_JVM_HEAD_ROOM", "10")
+	os.Setenv("BPI_APPLICATION_PATH", "/custom/app")
 
 	defer func() {
 		os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
 		os.Unsetenv("BPL_JVM_THREAD_COUNT")
 		os.Unsetenv("BPL_JVM_HEAD_ROOM")
+		os.Unsetenv("BPI_APPLICATION_PATH")
 	}()
 
 	cfg := Load()
@@ -57,6 +64,10 @@ func TestLoadWithEnvironmentVariables(t *testing.T) {
 	if cfg.HeadRoom != "10" {
 		t.Errorf("Expected head room '10', got '%s'", cfg.HeadRoom)
 	}
+
+	if cfg.Path != "/custom/app" {
+		t.Errorf("Expected path '/custom/app', got '%s'", cfg.Path)
+	}
 }
 
 func TestConfigValidation(t *testing.T) {
@@ -71,6 +82,7 @@ func TestConfigValidation(t *testing.T) {
 				ThreadCount:      "250",
 				LoadedClassCount: "", // empty is valid
 				HeadRoom:         "0",
+				Path:             "/app",
 			},
 			expectError: false,
 		},
@@ -80,6 +92,7 @@ func TestConfigValidation(t *testing.T) {
 				ThreadCount:      "300",
 				LoadedClassCount: "5000",
 				HeadRoom:         "5",
+				Path:             "/custom/app",
 			},
 			expectError: false,
 		},
@@ -89,6 +102,7 @@ func TestConfigValidation(t *testing.T) {
 				ThreadCount:      "-1",
 				LoadedClassCount: "1000",
 				HeadRoom:         "0",
+				Path:             "/app",
 			},
 			expectError: true,
 		},
@@ -98,6 +112,7 @@ func TestConfigValidation(t *testing.T) {
 				ThreadCount:      "abc",
 				LoadedClassCount: "1000",
 				HeadRoom:         "0",
+				Path:             "/app",
 			},
 			expectError: true,
 		},
@@ -107,6 +122,7 @@ func TestConfigValidation(t *testing.T) {
 				ThreadCount:      "250",
 				LoadedClassCount: "-1",
 				HeadRoom:         "0",
+				Path:             "/app",
 			},
 			expectError: true,
 		},
@@ -116,6 +132,7 @@ func TestConfigValidation(t *testing.T) {
 				ThreadCount:      "250",
 				LoadedClassCount: "1000",
 				HeadRoom:         "-1",
+				Path:             "/app",
 			},
 			expectError: true,
 		},
@@ -125,6 +142,17 @@ func TestConfigValidation(t *testing.T) {
 				ThreadCount:      "250",
 				LoadedClassCount: "1000",
 				HeadRoom:         "101",
+				Path:             "/app",
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid path - empty",
+			config: &Config{
+				ThreadCount:      "250",
+				LoadedClassCount: "1000",
+				HeadRoom:         "0",
+				Path:             "",
 			},
 			expectError: true,
 		},
@@ -152,6 +180,7 @@ func TestSetEnvironmentVariables(t *testing.T) {
 		ThreadCount:      "300",
 		LoadedClassCount: "40000",
 		HeadRoom:         "15",
+		Path:             "/custom/app",
 	}
 
 	cfg.SetEnvironmentVariables()
@@ -168,10 +197,15 @@ func TestSetEnvironmentVariables(t *testing.T) {
 		t.Errorf("Expected BPL_JVM_HEAD_ROOM=15, got %s", os.Getenv("BPL_JVM_HEAD_ROOM"))
 	}
 
+	if os.Getenv("BPI_APPLICATION_PATH") != "/custom/app" {
+		t.Errorf("Expected BPI_APPLICATION_PATH=/custom/app, got %s", os.Getenv("BPI_APPLICATION_PATH"))
+	}
+
 	// Clean up
 	os.Unsetenv("BPL_JVM_THREAD_COUNT")
 	os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
 	os.Unsetenv("BPL_JVM_HEAD_ROOM")
+	os.Unsetenv("BPI_APPLICATION_PATH")
 }
 
 func TestSetTotalMemory(t *testing.T) {

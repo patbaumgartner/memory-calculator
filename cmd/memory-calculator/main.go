@@ -67,6 +67,7 @@ func main() {
 	flag.StringVar(&cfg.ThreadCount, "thread-count", cfg.ThreadCount, "JVM thread count")
 	flag.StringVar(&cfg.LoadedClassCount, "loaded-class-count", cfg.LoadedClassCount, "JVM loaded class count")
 	flag.StringVar(&cfg.HeadRoom, "head-room", cfg.HeadRoom, "JVM head room percentage")
+	flag.StringVar(&cfg.Path, "path", cfg.Path, "Application path for JAR scanning and class counting")
 	flag.BoolVar(&cfg.Quiet, "quiet", false, "Only output JVM parameters, no formatting")
 	flag.BoolVar(&cfg.Version, "version", false, "Show version information")
 	flag.BoolVar(&cfg.Help, "help", false, "Show help")
@@ -117,9 +118,6 @@ func main() {
 
 // setDefaultEnvironmentVariables sets required default environment variables if not already set
 func setDefaultEnvironmentVariables() {
-	if os.Getenv("BPI_APPLICATION_PATH") == "" {
-		_ = os.Setenv("BPI_APPLICATION_PATH", "/app")
-	}
 	if os.Getenv("BPI_JVM_CLASS_COUNT") == "" {
 		_ = os.Setenv("BPI_JVM_CLASS_COUNT", "1000")
 	}

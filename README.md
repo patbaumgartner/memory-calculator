@@ -73,6 +73,9 @@ make build-ultimate-comparison
 
 # Advanced configuration with custom class count
 ./memory-calculator --total-memory 4G --loaded-class-count 50000 --head-room 15
+
+# Specify custom application path for class scanning
+./memory-calculator --path /my/application --total-memory 2G --thread-count 300
 ```
 
 ### Example Output
@@ -84,25 +87,26 @@ JVM Memory Configuration
 ==================================================
 Total Memory:       2.00 GB
 Thread Count:       250
-Loaded Classes:     35000 (detected from /app)
+Loaded Classes:     auto-calculated from /app
 Head Room:          0%
+Application Path:   /app
 
 Calculated JVM Arguments:
 ------------------------------
-Max Heap Size:         -Xmx324661K
-Thread Stack Size:     -Xss1M
-Max Metaspace Size:    -XX:MaxMetaspaceSize=211914K
-Direct Memory Size:    -XX:MaxDirectMemorySize=10M
-Code Cache Size:       -XX:ReservedCodeCacheSize=240M
+Max Heap Size:         1678125K
+Thread Stack Size:     1M
+Max Metaspace Size:    15654K
+Code Cache Size:       240M
+Direct Memory Size:    10M
 
-Environment Variables:
+Complete JVM Options:
 ------------------------------
-JAVA_TOOL_OPTIONS="-Xmx324661K -Xss1M -XX:MaxMetaspaceSize=211914K -XX:MaxDirectMemorySize=10M -XX:ReservedCodeCacheSize=240M"
+JAVA_TOOL_OPTIONS=-XX:MaxDirectMemorySize=10M -Xmx1678125K -XX:MaxMetaspaceSize=15654K -XX:ReservedCodeCacheSize=240M -Xss1M
 ```
 
 **Quiet Mode:**
 ```
--Xmx324661K -Xss1M -XX:MaxMetaspaceSize=211914K -XX:MaxDirectMemorySize=10M -XX:ReservedCodeCacheSize=240M
+-XX:MaxDirectMemorySize=10M -Xmx1678125K -XX:MaxMetaspaceSize=15654K -XX:ReservedCodeCacheSize=240M -Xss1M
 ```
 
 ## 🔧 Setting JAVA_TOOL_OPTIONS
@@ -238,7 +242,7 @@ This script automatically:
 | `--thread-count` | int | 250 | Number of threads for stack calculation |
 | `--loaded-class-count` | int | auto-detect | Number of loaded classes for metaspace |
 | `--head-room` | int | 0 | Percentage of total memory to reserve (0-99) |
-| `--path` | string | `.` | Path to scan for JAR files (class count estimation) |
+| `--path` | string | `/app` | Path to scan for JAR files (class count estimation) |
 | `--quiet` | bool | false | Output only JVM arguments for scripting |
 
 ### Memory Units

@@ -22,6 +22,9 @@ The memory calculator is designed to **calculate and output** JVM memory options
 # Calculate and set in one command
 export JAVA_TOOL_OPTIONS="$(./memory-calculator --total-memory=2G --quiet)"
 
+# With custom application path for better class count estimation
+export JAVA_TOOL_OPTIONS="$(./memory-calculator --total-memory=2G --path=/my/app --quiet)"
+
 # Verify it's set
 echo $JAVA_TOOL_OPTIONS
 # Output: -XX:MaxDirectMemorySize=10M -Xmx494583K -XX:MaxMetaspaceSize=41992K -XX:ReservedCodeCacheSize=240M -Xss1M
@@ -359,10 +362,15 @@ applications:
 
 **Issue**: "Unable to determine class count"
 ```bash
-# Solution: Set explicit class count or application path
+# Solution 1: Set explicit application path for automatic scanning
+./memory-calculator --path=/path/to/your/app --total-memory=2G
+
+# Solution 2: Set explicit class count
+./memory-calculator --loaded-class-count=10000 --total-memory=2G
+
+# Solution 3: Use environment variable
 export BPI_APPLICATION_PATH=/path/to/your/app
-# OR
-./memory-calculator --loaded-class-count=10000
+./memory-calculator --total-memory=2G
 ```
 
 **Issue**: Script fails in containers
@@ -384,6 +392,9 @@ chmod +x memory-calculator
 # Test quiet mode
 ./memory-calculator --total-memory=2G --quiet
 
+# Test with custom application path
+./memory-calculator --total-memory=2G --path=/my/app
+
 # Test with explicit values
 ./memory-calculator --total-memory=2G --loaded-class-count=5000 --thread-count=300
 
@@ -391,6 +402,45 @@ chmod +x memory-calculator
 echo "Current JAVA_TOOL_OPTIONS: $JAVA_TOOL_OPTIONS"
 env | grep JAVA_TOOL_OPTIONS
 ```
+
+## Enhanced Features
+
+### Application Path Scanning
+
+The `--path` parameter enables intelligent class count estimation by scanning JAR files in your application directory:
+
+```bash
+# Automatic class count estimation from application path
+./memory-calculator --path=/opt/myapp --total-memory=4G
+
+# The calculator will:
+# 1. Scan all JAR files in /opt/myapp recursively
+# 2. Count classes in each JAR
+# 3. Apply framework-specific scaling factors (Spring Boot, etc.)
+# 4. Display "Loaded Classes: auto-calculated from /opt/myapp"
+```
+
+**Benefits:**
+- More accurate metaspace allocation
+- Framework-aware class counting
+- Eliminates need to manually specify class counts
+- Clear display of calculation source
+
+### Improved Display Output
+
+The calculator now provides clearer information about calculated values:
+
+**When class count is auto-calculated:**
+```
+Loaded Classes:   auto-calculated from /opt/myapp
+```
+
+**When class count is manually specified:**
+```
+Loaded Classes:   50000
+```
+
+This makes it clear whether values were calculated automatically or provided manually.
 
 ## Best Practices
 
