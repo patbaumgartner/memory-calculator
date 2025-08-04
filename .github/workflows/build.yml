@@ -14,7 +14,7 @@ permissions:
   security-events: write
 
 env:
-  GO_VERSION: '1.24.5'
+  GO_VERSION: '1.24'
 
 jobs:
   test:
@@ -30,52 +30,23 @@ jobs:
         go-version: ${{ env.GO_VERSION }}
         cache: true
 
-    - name: Debug Go environment
-      run: |
-        echo "Go version: $(go version)"
-        echo "GOPATH: $GOPATH"
-        echo "GOROOT: $GOROOT"
-        echo "Working directory: $(pwd)"
-        echo "Directory contents:"
-        ls -la
-
     - name: Download dependencies
       run: go mod download
 
-    - name: Verify module structure
+    - name: Verify Go build
       run: |
-        echo "Checking Go module structure..."
-        go list -m
-        go list ./...
-        echo "Verifying main package exists..."
-        ls -la cmd/memory-calculator/
         echo "Testing build process..."
         go build -trimpath -ldflags "-s -w" -o test-binary ./cmd/memory-calculator
         ./test-binary --version
         rm test-binary
 
     - name: Run tests
-      run: |
-        echo "Running tests with race detection..."
-        go test -v -race -timeout=10m -coverprofile=coverage.out ./...
+      run: go test -v -race -timeout=10m -coverprofile=coverage.out ./...
       env:
         CGO_ENABLED: 1
 
-    - name: Run integration tests separately (if main tests failed)
-      if: failure()
-      run: |
-        echo "Main tests failed, trying integration tests separately..."
-        echo "Building binary first..."
-        go build -trimpath -ldflags "-s -w" -o test-binary ./cmd/memory-calculator
-        echo "Binary built successfully, running integration tests..."
-        go test -v -race -timeout=5m ./integration_test.go
-        rm -f test-binary
-
     - name: Generate coverage report
-      run: |
-        go tool cover -func=coverage.out
-        echo "Coverage Summary:"
-        go tool cover -func=coverage.out | tail -1
+      run: go tool cover -func=coverage.out
 
     - name: Run linting
       uses: golangci/golangci-lint-action@v6
@@ -126,36 +97,74 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Build binary
+    - name: Build binaries
       env:
         GOOS: ${{ matrix.goos }}
         GOARCH: ${{ matrix.goarch }}
-        CGO_ENABLED: 0  # Disable CGO for cross-compilation
       run: |
-        # Set version and build info
         VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "dev-${GITHUB_SHA::8}")
         BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
         COMMIT_HASH=${GITHUB_SHA::8}
         
-        # Create dist directory
         mkdir -p dist
         
-        # Build with ldflags
+        # Build standard binary
         BINARY_NAME="memory-calculator-${{ matrix.goos }}-${{ matrix.goarch }}"
-        
-        echo "Building for ${{ matrix.goos }}/${{ matrix.goarch }}..."
-        # Build with optimization flags for smaller binaries
-        go build \
+        env CGO_ENABLED=0 go build \
           -trimpath -a \
           -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w" \
           -o "dist/${BINARY_NAME}" \
           ./cmd/memory-calculator
+        
+        # Build minimal binary
+        MINIMAL_BINARY_NAME="memory-calculator-minimal-${{ matrix.goos }}-${{ matrix.goarch }}"
+        env CGO_ENABLED=0 go build \
+          -trimpath -a \
+          -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w" \
+          -tags minimal \
+          -o "dist/${MINIMAL_BINARY_NAME}" \
+          ./cmd/memory-calculator
+        
+        # Build static binary (Linux only)
+        if [ "${{ matrix.goos }}" = "linux" ]; then
+          STATIC_BINARY_NAME="memory-calculator-static-${{ matrix.goos }}-${{ matrix.goarch }}"
+          
+          # Install cross-compiler for ARM64
+          if [ "${{ matrix.goarch }}" = "arm64" ]; then
+            echo "Installing ARM64 cross-compiler..."
+            sudo apt-get update || { echo "Failed to update package list"; exit 1; }
+            sudo apt-get install -y gcc-aarch64-linux-gnu || { echo "Failed to install cross-compiler"; exit 1; }
+            export CC=aarch64-linux-gnu-gcc
+            echo "Cross-compiler installed successfully"
+          fi
+          
+          env CGO_ENABLED=1 go build \
+            -trimpath -a \
+            -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w -linkmode external -extldflags '-static'" \
+            -o "dist/${STATIC_BINARY_NAME}" \
+            ./cmd/memory-calculator
+        fi
 
-    - name: Upload build artifacts
+    - name: Upload standard build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: memory-calculator-${{ matrix.goos }}-${{ matrix.goarch }}
-        path: dist/
+        path: dist/memory-calculator-${{ matrix.goos }}-${{ matrix.goarch }}
+        retention-days: 7
+
+    - name: Upload minimal build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: memory-calculator-minimal-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/memory-calculator-minimal-${{ matrix.goos }}-${{ matrix.goarch }}
+        retention-days: 7
+
+    - name: Upload static build artifacts
+      if: matrix.goos == 'linux'
+      uses: actions/upload-artifact@v4
+      with:
+        name: memory-calculator-static-${{ matrix.goos }}-${{ matrix.goarch }}
+        path: dist/memory-calculator-static-${{ matrix.goos }}-${{ matrix.goarch }}
         retention-days: 7
 
   release:
@@ -169,51 +178,56 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
+    - name: Create dist directory
+      run: mkdir -p dist
+
+    - name: Download all build artifacts
+      uses: actions/download-artifact@v4
       with:
-        go-version: ${{ env.GO_VERSION }}
-        cache: true
+        path: artifacts
 
-    - name: Download dependencies
-      run: go mod download
-
-    - name: Build all platforms
+    - name: Organize artifacts for release
       run: |
-        mkdir -p dist
+        echo "Organizing artifacts for release..."
         
-        # Get version from git tag
-        VERSION=${GITHUB_REF#refs/tags/}
-        BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
-        COMMIT_HASH=${GITHUB_SHA::8}
+        # Move all artifacts to dist directory
+        find artifacts -type f -name "memory-calculator*" -exec mv {} dist/ \;
         
-        # Build matrix
-        declare -a platforms=(
-          "linux/amd64"
-          "linux/arm64"
-          "darwin/amd64"
-          "darwin/arm64"
+        # List all files that will be released
+        echo "Files to be released:"
+        ls -la dist/
+        
+        # Verify we have the expected files
+        expected_files=(
+          "memory-calculator-linux-amd64"
+          "memory-calculator-linux-arm64"
+          "memory-calculator-darwin-amd64"
+          "memory-calculator-darwin-arm64"
+          "memory-calculator-minimal-linux-amd64"
+          "memory-calculator-minimal-linux-arm64"
+          "memory-calculator-minimal-darwin-amd64"
+          "memory-calculator-minimal-darwin-arm64"
+          "memory-calculator-static-linux-amd64"
+          "memory-calculator-static-linux-arm64"
         )
         
-        for platform in "${platforms[@]}"; do
-          IFS='/' read -r -a array <<< "$platform"
-          GOOS="${array[0]}"
-          GOARCH="${array[1]}"
-          
-          BINARY_NAME="memory-calculator-${GOOS}-${GOARCH}"
-          
-          echo "Building for $GOOS/$GOARCH..."
-          env GOOS="$GOOS" GOARCH="$GOARCH" CGO_ENABLED=0 go build \
-            -trimpath -a \
-            -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w" \
-            -o "dist/${BINARY_NAME}" \
-            ./cmd/memory-calculator
+        missing_files=()
+        for file in "${expected_files[@]}"; do
+          if [ ! -f "dist/$file" ]; then
+            missing_files+=("$file")
+          fi
         done
+        
+        if [ ${#missing_files[@]} -gt 0 ]; then
+          echo "Warning: Missing expected files:"
+          printf '%s\n' "${missing_files[@]}"
+        fi
         
         # Create checksums
         cd dist
         sha256sum * > checksums.txt
-        cd ..
+        echo "Checksums created:"
+        cat checksums.txt
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
@@ -257,13 +271,43 @@ jobs:
           type=semver,pattern={{major}}.{{minor}}
           type=raw,value=latest,enable={{is_default_branch}}
 
+    - name: Set build time
+      id: build_time
+      run: echo "time=$(date -u '+%Y-%m-%d_%H:%M:%S')" >> $GITHUB_OUTPUT
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v6
       with:
         context: .
+        file: Dockerfile
+        target: alpine
         platforms: linux/amd64,linux/arm64
         push: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha,scope=docker-build
+        cache-to: type=gha,mode=max,scope=docker-build
+        build-args: |
+          VERSION=${{ github.ref_name }}
+          BUILD_TIME=${{ steps.build_time.outputs.time }}
+          COMMIT_HASH=${{ github.sha }}
+
+    - name: Test Docker image
+      run: |
+        echo "Testing Docker image functionality..."
+        
+        # Test version command
+        echo "Testing --version command:"
+        docker run --rm ${{ secrets.DOCKER_USERNAME }}/memory-calculator:latest --version || {
+          echo "Version test failed"
+          exit 1
+        }
+        
+        # Test memory calculation
+        echo "Testing memory calculation:"
+        docker run --rm --memory=1g ${{ secrets.DOCKER_USERNAME }}/memory-calculator:latest --total-memory=1G --loaded-class-count=5000 --quiet || {
+          echo "Memory calculation test failed"
+          exit 1
+        }
+        
+        echo "Docker image tests completed successfully"

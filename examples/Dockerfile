@@ -2,7 +2,7 @@
 # Production-ready Dockerfile using memory calculator
 
 # Multi-stage build
-FROM golang:1.21-alpine AS calculator-builder
+FROM golang:1.24-alpine AS calculator-builder
 WORKDIR /build
 COPY . .
 RUN apk add --no-cache make && make build-minimal

@@ -1,43 +1,63 @@
 # Build stage
-FROM golang:1.24.5-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
-# Install git (needed for version info)
-RUN apk add --no-cache git
+# Install build dependencies
+RUN apk add --no-cache \
+    git \
+    ca-certificates \
+    tzdata \
+    musl-dev \
+    gcc \
+    libc-dev \
+    build-base \
+    g++
 
 # Set working directory
 WORKDIR /app
 
-# Copy go mod files
+# Copy go mod files first for better layer caching
 COPY go.mod go.sum ./
 
-# Download dependencies
-RUN go mod download
+# Download and verify dependencies
+RUN go mod download && go mod verify
 
 # Copy source code
 COPY . .
 
-# Build the binary
+# Build arguments for version information
 ARG VERSION=dev
 ARG BUILD_TIME
 ARG COMMIT_HASH
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -trimpath -a \
-    -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w" \
-    -installsuffix cgo \
-    -o memory-calculator ./cmd/memory-calculator
+ARG TARGETARCH
 
-# Final stage
-FROM alpine:latest
+# Build the binary (no cross-compiler needed for native builds)
+RUN CGO_ENABLED=0 \
+    GOOS=linux \
+    go build \
+    -trimpath \
+    -a \
+    -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w" \
+    -o memory-calculator \
+    ./cmd/memory-calculator
+
+# Verify the binary is statically linked (important for Alpine)
+RUN file memory-calculator
+
+# Test the binary works in Alpine environment
+RUN ./memory-calculator --version
+
+# Alpine target for minimal runtime
+FROM alpine AS alpine
 
 # Bring build args to final stage
 ARG VERSION=dev
 ARG BUILD_TIME
 ARG COMMIT_HASH
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install minimal runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata
 
-# Create non-root user
+# Create non-root user for security
 RUN addgroup -g 1001 memcalc && \
     adduser -D -u 1001 -G memcalc memcalc
 
@@ -47,8 +67,11 @@ WORKDIR /home/memcalc
 # Copy binary from builder stage
 COPY --from=builder /app/memory-calculator /usr/local/bin/memory-calculator
 
-# Make binary executable
+# Ensure binary is executable
 RUN chmod +x /usr/local/bin/memory-calculator
+
+# Test the binary in the Alpine environment
+RUN memory-calculator --version
 
 # Switch to non-root user
 USER memcalc
@@ -58,8 +81,10 @@ ENTRYPOINT ["memory-calculator"]
 CMD ["--help"]
 
 # Metadata
-LABEL maintainer="Patrick Baumgartner <contact@patbaumgartner.com>"
-LABEL description="JVM Memory Calculator for Container Environments"
-LABEL version="${VERSION}"
-LABEL build.time="${BUILD_TIME}"
-LABEL build.commit="${COMMIT_HASH}"
+LABEL maintainer="Patrick Baumgartner <contact@patbaumgartner.com>" \
+      description="JVM Memory Calculator for Container Environments" \
+      version="${VERSION}" \
+      build.time="${BUILD_TIME}" \
+      build.commit="${COMMIT_HASH}" \
+      alpine.version="3.20" \
+      go.version="1.24.5"

@@ -39,7 +39,7 @@ BUILD_FLAGS=-trimpath -a
 DIST_DIR=dist
 COVERAGE_DIR=coverage
 
-.PHONY: all build build-all build-compressed build-minimal build-size-comparison build-ultimate-comparison clean test test-all integration test-coverage coverage coverage-html benchmark benchmark-compare deps tools tools-check security security-install vuln-check vulncheck vuln-install format quality lint lint-install dev dev-test install release-check docker-build docker-run docker-test help
+.PHONY: all build build-all clean test test-all integration test-coverage coverage coverage-html benchmark benchmark-compare deps tools tools-check security security-install vuln-check vulncheck vuln-install format quality lint lint-install dev dev-test install release-check docker-build docker-run docker-test help
 
 all: clean deps test build ## Build everything (clean, deps, test, build)
 
@@ -52,70 +52,57 @@ build: ## Build binary for current platform
 build-all: ## Build binaries for all platforms
 	@echo "Building $(BINARY_NAME) for all platforms..."
 	@mkdir -p $(DIST_DIR)
-	
+
+	@echo "Building static linked binaries..."
 	# Linux amd64
-	GOOS=linux GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/memory-calculator
+	GOOS=linux GOARCH=amd64 GO_ENABLED=1 $(GOBUILD) $(BUILD_FLAGS) -installsuffix cgo -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w -linkmode external -extldflags '-static'" -o $(DIST_DIR)/$(BINARY_NAME)-static-amd64 ./cmd/memory-calculator
+
+	# Linux arm64
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc $(GOBUILD) $(BUILD_FLAGS) -installsuffix cgo -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w -linkmode external -extldflags '-static'" -o $(DIST_DIR)/$(BINARY_NAME)-static-arm64 ./cmd/memory-calculator
+
+	@echo "Building standard binaries..."
+	# Linux amd64
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-amd64 ./cmd/memory-calculator
 	
 	# Linux arm64
-	GOOS=linux GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/memory-calculator
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-linux-arm64 ./cmd/memory-calculator
 	
 	# macOS amd64
-	GOOS=darwin GOARCH=amd64 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/memory-calculator
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-amd64 ./cmd/memory-calculator
 	
 	# macOS arm64 (Apple Silicon)
-	GOOS=darwin GOARCH=arm64 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/memory-calculator
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/memory-calculator
 	
-	@echo "Cross-platform build complete. Binaries in $(DIST_DIR)/"
-	@ls -la $(DIST_DIR)/
+	@echo "Building minimal variants..."
+	# Minimal Linux amd64
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) \
+		-tags minimal \
+		-o $(DIST_DIR)/$(BINARY_NAME)-minimal-linux-amd64 ./cmd/memory-calculator
+	
+	# Minimal Linux arm64
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) \
+		-tags minimal \
+		-o $(DIST_DIR)/$(BINARY_NAME)-minimal-linux-arm64 ./cmd/memory-calculator
 
-build-compressed: ## Build ultra-compressed binary (requires upx)
-	@echo "Building ultra-compressed $(BINARY_NAME)..."
-	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BINARY_NAME) ./cmd/memory-calculator
-	@if command -v upx >/dev/null 2>&1; then \
-		echo "Compressing binary with UPX..."; \
-		upx --best --lzma $(BINARY_NAME); \
-		echo "Ultra-compressed build complete: $(BINARY_NAME)"; \
-	else \
-		echo "Warning: UPX not found. Install with: sudo apt install upx-ucl (Ubuntu/Debian) or brew install upx (macOS)"; \
-		echo "Regular optimized build complete: $(BINARY_NAME)"; \
-	fi
+	# Minimal macOS amd64
+	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) \
+		-tags minimal \
+		-o $(DIST_DIR)/$(BINARY_NAME)-minimal-darwin-amd64 ./cmd/memory-calculator
 
-build-minimal: ## Build minimal binary without optional features
-	@echo "Building minimal $(BINARY_NAME) (excludes ZIP processing, uses estimates)..."
-	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -tags minimal -o $(BINARY_NAME)-minimal ./cmd/memory-calculator
-	@echo "Minimal build complete: $(BINARY_NAME)-minimal"
-
-build-size-comparison: ## Compare binary sizes with and without optimization
-	@echo "Building size comparison..."
-	@echo "Building without optimization..."
-	$(GOBUILD) -ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.commitHash=$(COMMIT_HASH)" -o $(BINARY_NAME)-unoptimized ./cmd/memory-calculator
-	@echo "Building with optimization..."
-	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BINARY_NAME)-optimized ./cmd/memory-calculator
+	# Minimal macOS arm64 (Apple Silicon)
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) \
+		-tags minimal \
+		-o $(DIST_DIR)/$(BINARY_NAME)-minimal-darwin-arm64 ./cmd/memory-calculator
+	
 	@echo ""
-	@echo "Size comparison:"
-	@echo "Unoptimized: $$(du -h $(BINARY_NAME)-unoptimized | cut -f1)"
-	@echo "Optimized:   $$(du -h $(BINARY_NAME)-optimized | cut -f1)"
-	@echo "Savings:     $$(echo "scale=1; (($$(stat -c%s $(BINARY_NAME)-unoptimized) - $$(stat -c%s $(BINARY_NAME)-optimized)) / $$(stat -c%s $(BINARY_NAME)-unoptimized)) * 100" | bc)%"
-	@rm -f $(BINARY_NAME)-unoptimized $(BINARY_NAME)-optimized
-
-build-ultimate-comparison: ## Compare all build variants (standard, minimal, compressed)
-	@echo "Building ultimate size comparison..."
-	@echo "1. Building standard optimized..."
-	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BINARY_NAME)-standard ./cmd/memory-calculator
-	@echo "2. Building minimal..."
-	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -tags minimal -o $(BINARY_NAME)-minimal ./cmd/memory-calculator
-	@echo "3. Building unoptimized (for comparison)..."
-	$(GOBUILD) -ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.commitHash=$(COMMIT_HASH)" -o $(BINARY_NAME)-unoptimized ./cmd/memory-calculator
+	@echo "✓ Cross-platform build complete!"
+	@echo "Total binaries: $$(ls -1 $(DIST_DIR)/ | wc -l)"
+	@echo "Output directory: $(DIST_DIR)/ ($$(du -sh $(DIST_DIR)/ | cut -f1))"
 	@echo ""
-	@echo "Ultimate size comparison:"
-	@echo "Unoptimized: $$(du -h $(BINARY_NAME)-unoptimized | cut -f1)"
-	@echo "Standard:    $$(du -h $(BINARY_NAME)-standard | cut -f1)"
-	@echo "Minimal:     $$(du -h $(BINARY_NAME)-minimal | cut -f1)"
-	@echo ""
-	@echo "Savings (vs unoptimized):"
-	@echo "Standard: $$(echo "scale=1; (($$(stat -c%s $(BINARY_NAME)-unoptimized) - $$(stat -c%s $(BINARY_NAME)-standard)) / $$(stat -c%s $(BINARY_NAME)-unoptimized)) * 100" | bc)%"
-	@echo "Minimal:  $$(echo "scale=1; (($$(stat -c%s $(BINARY_NAME)-unoptimized) - $$(stat -c%s $(BINARY_NAME)-minimal)) / $$(stat -c%s $(BINARY_NAME)-unoptimized)) * 100" | bc)%"
-	@rm -f $(BINARY_NAME)-unoptimized $(BINARY_NAME)-standard $(BINARY_NAME)-minimal
+	@echo "Available builds:"
+	@echo "  Static:  $$(ls -1 $(DIST_DIR)/$(BINARY_NAME)-static-* 2>/dev/null | wc -l) binaries"
+	@echo "  Standard: $$(ls -1 $(DIST_DIR)/$(BINARY_NAME)-linux-* $(DIST_DIR)/$(BINARY_NAME)-darwin-* 2>/dev/null | wc -l) binaries"
+	@echo "  Minimal:  $$(ls -1 $(DIST_DIR)/$(BINARY_NAME)-minimal-* 2>/dev/null | wc -l) binaries"
 
 ## Test commands
 test: ## Run all tests
@@ -204,9 +191,6 @@ vuln-check: ## Check for known vulnerabilities
 		$(GOBIN)/govulncheck ./...; \
 	fi
 
-vulncheck: ## Check for known vulnerabilities (alias for vuln-check)
-	@$(MAKE) vuln-check
-
 vuln-install: ## Install vulnerability checker
 	@echo "Installing vulnerability checker..."
 	$(GOCMD) install golang.org/x/vuln/cmd/govulncheck@latest
@@ -215,7 +199,7 @@ vuln-install: ## Install vulnerability checker
 clean: ## Clean build artifacts
 	@echo "Cleaning build artifacts..."
 	$(GOCLEAN)
-	rm -rf $(BINARY_NAME)
+	rm -rf $(BINARY_NAME) $(BINARY_NAME)-minimal
 	rm -rf $(DIST_DIR)
 	rm -rf $(COVERAGE_DIR)
 
@@ -234,7 +218,7 @@ quality: ## Run all quality checks (format, lint, security, vulnerabilities)
 	@$(MAKE) format
 	@$(MAKE) lint
 	@$(MAKE) security
-	@$(MAKE) vulncheck
+	@$(MAKE) vuln-check
 	@echo "All quality checks completed ✓"
 
 lint: ## Run linter (requires golangci-lint)
@@ -288,8 +272,11 @@ docker-run: ## Run Docker container
 	docker run --rm $(BINARY_NAME):latest
 
 docker-test: ## Test Docker container with memory limit
-	@echo "Testing Docker container with 2G memory limit..."
-	docker run --rm --memory=2g $(BINARY_NAME):latest
+	@echo "Testing Alpine Docker image..."
+	docker run --rm $(BINARY_NAME):alpine --version
+	docker run --rm $(BINARY_NAME):alpine --help
+	@echo "Testing with memory limits..."
+	docker run --rm --memory=1g $(BINARY_NAME):alpine --loaded-class-count=999 --total-memory=1G
 
 ## Help
 help: ## Show this help message

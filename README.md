@@ -48,9 +48,10 @@ make build-ultimate-comparison
 ```
 
 **Build Variants:**
-- **Standard**: Full regex-based parsing, complete ZIP/JAR processing (2.4MB)
-- **Minimal**: String-based parsing, size estimation, fewer dependencies (2.2MB)
-- Both variants produce identical output and functionality
+- **Standard**: Full regex-based parsing, complete ZIP/JAR processing (~2.3MB)
+- **Alpine**: Statically linked for Alpine Linux (~2.3MB, no dependencies)
+- **Minimal**: String-based parsing, size estimation, fewer dependencies (~2.1MB)
+- All variants produce identical output and functionality
 
 **Testing:**
 - **Comprehensive Unit Tests**: All build variants tested automatically
@@ -145,27 +146,46 @@ java -jar myapp.jar
 
 ### Docker/Container Usage
 
+#### Alpine Linux Support 🏔️
+Multiple optimized builds available:
+
+```bash
+# Alpine build (8MB, full features)
+docker run --rm patbaumgartner/memory-calculator:alpine --total-memory=1G
+
+# Scratch build (2.3MB, minimal)  
+docker run --rm patbaumgartner/memory-calculator:scratch --total-memory=1G
+
+# Build locally
+make build-alpine      # Single Alpine build
+make build-alpine-all  # All Alpine architectures
+```
+
+#### Integration Examples
+
 ```dockerfile
-# Method 1: Multi-stage build
-FROM golang:1.21 as calculator
+# Alpine multi-stage build
+FROM golang:1.24-alpine3.20 as builder
 COPY . /build
 WORKDIR /build
-RUN make build-minimal
+RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o memory-calculator ./cmd/memory-calculator
 
-FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl
-COPY --from=calculator /build/memory-calculator /usr/local/bin/
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /build/memory-calculator /usr/local/bin/
 
 # Set JVM options at runtime
-RUN echo '#!/bin/bash\nexport JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)"\nexec "$@"' > /entrypoint.sh
+RUN echo '#!/bin/sh\nexport JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)"\nexec "$@"' > /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["java", "-jar", "app.jar"]
 ```
 
 ```dockerfile
-# Method 2: Runtime calculation
-FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl
-COPY memory-calculator /usr/local/bin/
+# Scratch build (minimal footprint)
+FROM patbaumgartner/memory-calculator:scratch as calc
+FROM openjdk:21-jre-slim
+COPY --from=calc /memory-calculator /usr/local/bin/memory-calculator
 COPY app.jar /app.jar
 
 CMD export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)" && java -jar /app.jar
