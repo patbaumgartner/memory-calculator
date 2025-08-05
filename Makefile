@@ -32,7 +32,7 @@ GOFUMPT=$(shell command -v gofumpt 2>/dev/null || echo "$(GOBIN)/gofumpt")
 # -w: Strip DWARF debug info (reduces size further)  
 # -trimpath: Remove file system paths from executable (reproducible builds)
 # -a: Force rebuilding of packages (ensures clean build)
-LDFLAGS=-ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.commitHash=$(COMMIT_HASH) -s -w"
+LDFLAGS=-ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w"
 BUILD_FLAGS=-trimpath -a
 
 # Output directories
@@ -264,8 +264,8 @@ release-check: ## Check if ready for release
 ## Docker commands
 docker-build: ## Build Docker image
 	@echo "Building Docker image..."
-	docker build -t $(BINARY_NAME):$(VERSION) .
-	docker tag $(BINARY_NAME):$(VERSION) $(BINARY_NAME):latest
+	docker build -t $(BINARY_NAME):${VERSION} .
+	docker tag $(BINARY_NAME):${VERSION} $(BINARY_NAME):latest
 
 docker-run: ## Run Docker container
 	@echo "Running Docker container..."

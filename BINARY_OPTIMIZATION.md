@@ -77,7 +77,7 @@ Requires UPX to be installed. Produces the smallest possible binary.
 ### Makefile Configuration
 ```makefile
 # Build flags for optimized binaries
-LDFLAGS=-ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.commitHash=$(COMMIT_HASH) -s -w"
+LDFLAGS=-ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w"
 BUILD_FLAGS=-trimpath -a
 ```
 

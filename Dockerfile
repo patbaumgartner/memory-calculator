@@ -6,11 +6,7 @@ RUN apk add --no-cache \
     git \
     ca-certificates \
     tzdata \
-    musl-dev \
-    gcc \
-    libc-dev \
-    build-base \
-    g++
+    build-base
 
 # Set working directory
 WORKDIR /app
@@ -47,7 +43,7 @@ RUN file memory-calculator
 RUN ./memory-calculator --version
 
 # Alpine target for minimal runtime
-FROM alpine AS alpine
+FROM eclipse-temurin:21-jre-alpine AS alpine
 
 # Bring build args to final stage
 ARG VERSION=dev
