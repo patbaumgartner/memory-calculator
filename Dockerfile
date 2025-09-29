@@ -43,7 +43,7 @@ RUN file memory-calculator
 RUN ./memory-calculator --version
 
 # Alpine target for minimal runtime
-FROM eclipse-temurin:21-jre-alpine AS alpine
+FROM eclipse-temurin:25-jre-alpine AS alpine
 
 # Bring build args to final stage
 ARG VERSION=dev
