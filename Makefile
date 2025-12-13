@@ -175,7 +175,7 @@ deps: ## Download dependencies
 tools: ## Install all required development tools
 	@echo "Installing development tools..."
 	@echo "Installing golangci-lint..."
-	$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	$(GOCMD) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 	@echo "Installing gosec..."
 	$(GOCMD) install github.com/securego/gosec/v2/cmd/gosec@latest
 	@echo "Installing govulncheck..."
@@ -259,7 +259,7 @@ lint: ## Run linter (requires golangci-lint)
 
 lint-install: ## Install golangci-lint
 	@echo "Installing golangci-lint..."
-	$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	$(GOCMD) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
 
 ## Development commands
 dev: ## Run in development mode

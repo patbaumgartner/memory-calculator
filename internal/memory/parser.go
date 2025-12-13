@@ -67,9 +67,10 @@ const (
 
 	// GB represents one gigabyte in binary notation (1,073,741,824 bytes)
 	GB = MB * 1024
+	// TB represents one terabyte in binary notation.
 	TB = GB * 1024
 
-	// Maximum supported memory size (1PB to prevent overflow)
+	// MaxMemorySize is the maximum supported memory size (1PB to prevent overflow).
 	MaxMemorySize = 1024 * TB
 )
 

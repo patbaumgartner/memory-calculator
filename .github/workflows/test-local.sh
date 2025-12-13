@@ -8,7 +8,7 @@ echo "🚀 Simulating GitHub Actions environment locally..."
 
 # Set environment variables similar to GitHub Actions
 export CGO_ENABLED=1
-export GO_VERSION="1.24.5"
+export GO_VERSION="1.25.5"
 
 echo "📋 Environment Information:"
 echo "Go version: $(go version)"

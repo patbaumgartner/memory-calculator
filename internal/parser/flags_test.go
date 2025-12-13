@@ -52,9 +52,13 @@ func TestParseFlags(t *testing.T) {
 			expected: []string{"-javaagent:/path/to/agent.jar=option1,option2"},
 		},
 		{
-			name:     "Complex real-world example",
-			input:    `-Xmx2G -Xms1G -XX:MaxMetaspaceSize=256M -Djava.awt.headless=true -Dspring.profiles.active="production" -javaagent:/opt/agents/jmx.jar`,
-			expected: []string{"-Xmx2G", "-Xms1G", "-XX:MaxMetaspaceSize=256M", "-Djava.awt.headless=true", "-Dspring.profiles.active=production", "-javaagent:/opt/agents/jmx.jar"},
+			name: "Complex real-world example",
+			input: `-Xmx2G -Xms1G -XX:MaxMetaspaceSize=256M -Djava.awt.headless=true ` +
+				`-Dspring.profiles.active="production" -javaagent:/opt/agents/jmx.jar`,
+			expected: []string{
+				"-Xmx2G", "-Xms1G", "-XX:MaxMetaspaceSize=256M", "-Djava.awt.headless=true",
+				"-Dspring.profiles.active=production", "-javaagent:/opt/agents/jmx.jar",
+			},
 		},
 		{
 			name:     "Escaped quotes",

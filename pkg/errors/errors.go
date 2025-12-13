@@ -1,4 +1,6 @@
 // Package errors provides structured error types for the memory calculator.
+//
+//nolint:revive // Package name "errors" is intentional for this package
 package errors
 
 import (

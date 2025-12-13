@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	// Maximum realistic memory limit (1TB) to filter out "no limit" values
+	// MaxRealisticMemory is the maximum realistic memory limit (1TB) to filter out "no limit" values
 	MaxRealisticMemory = 1024 * 1024 * 1024 * 1024
 )
 
@@ -84,7 +84,7 @@ func (d *Detector) readCgroupsV2() (int64, error) {
 	if err != nil {
 		return 0, errors.NewCgroupsError(d.CgroupsV2Path, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	if !scanner.Scan() {
@@ -114,7 +114,7 @@ func (d *Detector) readCgroupsV1() (int64, error) {
 	if err != nil {
 		return 0, errors.NewCgroupsError(d.CgroupsV1Path, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	if !scanner.Scan() {

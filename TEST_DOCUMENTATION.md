@@ -348,7 +348,7 @@ make tools-check      # Verify tools are available
 The project uses comprehensive **automated testing** via GitHub Actions on every push and pull request:
 
 #### Test Pipeline Components
-1. **Go Environment Setup**: Tests on Go 1.24.5 with module caching
+1. **Go Environment Setup**: Tests on Go 1.25.5 with module caching
 2. **Dependency Verification**: Downloads and verifies all Go modules
 3. **Module Structure Check**: Validates project structure and build process
 4. **Race Detection**: Runs all tests with `-race` flag for concurrency issues

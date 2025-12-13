@@ -1,6 +1,6 @@
 //go:build !minimal
 
-// Standard build using existing regex-based functions
+// Package calc provides memory calculation logic.
 package calc
 
 // Build tag wrappers for standard build (use existing functions)

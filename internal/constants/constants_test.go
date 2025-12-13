@@ -116,29 +116,29 @@ func TestOutputFormatting(t *testing.T) {
 	}
 }
 
-func TestConstantTypes(t *testing.T) {
+func TestConstantTypes(_ *testing.T) {
 	// Test that constants have expected types
-	var _ string = ApplicationName
-	var _ string = DefaultVersion
-	var _ string = UnknownValue
-	var _ string = DefaultThreadCount
-	var _ string = DefaultHeadRoom
-	var _ string = DefaultApplicationPath
-	var _ string = EnvTotalMemory
-	var _ string = EnvThreadCount
-	var _ string = EnvLoadedClassCount
-	var _ string = EnvHeadRoom
-	var _ string = EnvApplicationPath
-	var _ string = EnvJVMClassCount
-	var _ string = EnvQuiet
-	var _ string = DefaultMemoryLimitPathV1
-	var _ string = DefaultMemoryLimitPathV2
-	var _ string = DefaultMemoryInfoPath
-	var _ int = MaxJVMSizeGB
+	_ = ApplicationName
+	_ = DefaultVersion
+	_ = UnknownValue
+	_ = DefaultThreadCount
+	_ = DefaultHeadRoom
+	_ = DefaultApplicationPath
+	_ = EnvTotalMemory
+	_ = EnvThreadCount
+	_ = EnvLoadedClassCount
+	_ = EnvHeadRoom
+	_ = EnvApplicationPath
+	_ = EnvJVMClassCount
+	_ = EnvQuiet
+	_ = DefaultMemoryLimitPathV1
+	_ = DefaultMemoryLimitPathV2
+	_ = DefaultMemoryInfoPath
+	_ = MaxJVMSizeGB
 	var _ int64 = MaxRealisticMemoryBytes
 	var _ int64 = MinValidMemoryBytes
-	var _ string = HelpSeparator
-	var _ string = IndentationSpaces
+	_ = HelpSeparator
+	_ = IndentationSpaces
 }
 
 func TestConstantImmutability(t *testing.T) {

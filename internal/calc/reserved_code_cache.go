@@ -7,20 +7,25 @@ import (
 )
 
 var (
+	// DefaultReservedCodeCache is the default reserved code cache size (240MB).
 	DefaultReservedCodeCache = ReservedCodeCache{Value: 240 * Mebi, Provenance: Default}
-	ReservedCodeCacheRE      = regexp.MustCompile(fmt.Sprintf("^-XX:ReservedCodeCacheSize=(%s)$", SizePattern))
+	// ReservedCodeCacheRE is the regular expression for matching reserved code cache flags.
+	ReservedCodeCacheRE = regexp.MustCompile(fmt.Sprintf("^-XX:ReservedCodeCacheSize=(%s)$", SizePattern))
 )
 
+// ReservedCodeCache represents the reserved code cache memory size.
 type ReservedCodeCache Size
 
 func (r ReservedCodeCache) String() string {
 	return fmt.Sprintf("-XX:ReservedCodeCacheSize=%s", Size(r))
 }
 
+// MatchReservedCodeCache returns true if the string matches the reserved code cache flag pattern.
 func MatchReservedCodeCache(s string) bool {
 	return ReservedCodeCacheRE.MatchString(strings.TrimSpace(s))
 }
 
+// ParseReservedCodeCache parses a string into a ReservedCodeCache object.
 func ParseReservedCodeCache(s string) (ReservedCodeCache, error) {
 	g := ReservedCodeCacheRE.FindStringSubmatch(s)
 	if g == nil {

@@ -14,20 +14,20 @@ func TestClassesOnFilesystem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test files
-	err = os.WriteFile(filepath.Join(tempDir, "Test.class"), []byte{}, 0o644)
+	err = os.WriteFile(filepath.Join(tempDir, "Test.class"), []byte{}, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.MkdirAll(filepath.Join(tempDir, "com", "example"), 0o755)
+	err = os.MkdirAll(filepath.Join(tempDir, "com", "example"), 0o750)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(filepath.Join(tempDir, "com", "example", "Another.class"), []byte{}, 0o644)
+	err = os.WriteFile(filepath.Join(tempDir, "com", "example", "Another.class"), []byte{}, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,20 +50,20 @@ func TestClassesWithNonClassFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create test files
-	err = os.WriteFile(filepath.Join(tempDir, "Test.class"), []byte{}, 0o644)
+	err = os.WriteFile(filepath.Join(tempDir, "Test.class"), []byte{}, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(filepath.Join(tempDir, "readme.txt"), []byte{}, 0o644)
+	err = os.WriteFile(filepath.Join(tempDir, "readme.txt"), []byte{}, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = os.WriteFile(filepath.Join(tempDir, "config.properties"), []byte{}, 0o644)
+	err = os.WriteFile(filepath.Join(tempDir, "config.properties"), []byte{}, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestEstimateModuleClasses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tempFile.Name())
+	defer func() { _ = os.Remove(tempFile.Name()) }()
 
 	// Write some data to simulate a modules file
 	data := make([]byte, 10000) // 10KB file
@@ -111,7 +111,7 @@ func TestEstimateModuleClasses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tempFile.Close()
+	_ = tempFile.Close()
 
 	count, err := estimateModuleClasses(tempFile.Name())
 	if err != nil {
@@ -130,11 +130,11 @@ func TestClassesWithModulesFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create lib directory
 	libDir := filepath.Join(tempDir, "lib")
-	err = os.MkdirAll(libDir, 0o755)
+	err = os.MkdirAll(libDir, 0o750)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestClassesWithModulesFile(t *testing.T) {
 	// Create modules file
 	modulesFile := filepath.Join(libDir, "modules")
 	data := make([]byte, 50000) // 50KB modules file
-	err = os.WriteFile(modulesFile, data, 0o644)
+	err = os.WriteFile(modulesFile, data, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,10 +164,10 @@ func TestClassesWithoutModulesFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create a class file
-	err = os.WriteFile(filepath.Join(tempDir, "Test.class"), []byte{}, 0o644)
+	err = os.WriteFile(filepath.Join(tempDir, "Test.class"), []byte{}, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,14 +189,14 @@ func TestJarClassesWithVariousExtensions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Test all supported class extensions
 	extensions := []string{".class", ".classdata", ".clj", ".groovy", ".kts"}
 
 	for i, ext := range extensions {
 		filename := filepath.Join(tempDir, "Test"+string(rune('0'+i))+ext)
-		err = os.WriteFile(filename, []byte{}, 0o644)
+		err = os.WriteFile(filename, []byte{}, 0o600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -218,7 +218,7 @@ func TestJarClassesWithEmptyDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	count, err := JarClasses(tempDir)
 	if err != nil {
@@ -235,11 +235,11 @@ func TestJarClassesWithDeepNesting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create deeply nested structure
 	deepPath := filepath.Join(tempDir, "a", "b", "c", "d", "e", "f", "g")
-	err = os.MkdirAll(deepPath, 0o755)
+	err = os.MkdirAll(deepPath, 0o750)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestJarClassesWithDeepNesting(t *testing.T) {
 	}
 
 	for _, path := range paths {
-		err = os.WriteFile(path, []byte{}, 0o644)
+		err = os.WriteFile(path, []byte{}, 0o600)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -275,10 +275,11 @@ func TestJarClassesWithActualJarFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create a real JAR file with class entries
 	jarPath := filepath.Join(tempDir, "test.jar")
+	//nolint:gosec // Safe in tests
 	jarFile, err := os.Create(jarPath)
 	if err != nil {
 		t.Fatal(err)
@@ -305,8 +306,10 @@ func TestJarClassesWithActualJarFile(t *testing.T) {
 		}
 	}
 
-	zipWriter.Close()
-	jarFile.Close()
+	//nolint:errcheck // Ignore close error in test cleanup
+	_ = zipWriter.Close()
+	//nolint:errcheck // Ignore close error in test cleanup
+	_ = jarFile.Close()
 
 	count, err := JarClasses(tempDir)
 	if err != nil {
@@ -325,11 +328,11 @@ func TestJarClassesWithZeroByteNoneJar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create zero-byte JAR with 'none' in name
 	noneJarPath := filepath.Join(tempDir, "svm-none.jar")
-	err = os.WriteFile(noneJarPath, []byte{}, 0o644)
+	err = os.WriteFile(noneJarPath, []byte{}, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,11 +353,11 @@ func TestJarClassesWithInvalidJar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create a file with .jar extension but invalid ZIP content
 	invalidJarPath := filepath.Join(tempDir, "invalid.jar")
-	err = os.WriteFile(invalidJarPath, []byte("this is not a zip file"), 0o644)
+	err = os.WriteFile(invalidJarPath, []byte("this is not a zip file"), 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,22 +378,22 @@ func TestJarClassesFromMixedPaths(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir1)
+	defer func() { _ = os.RemoveAll(tempDir1) }()
 
 	tempDir2, err := os.MkdirTemp("", "mixed-test2")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir2)
+	defer func() { _ = os.RemoveAll(tempDir2) }()
 
 	// Create class files in first directory
-	err = os.WriteFile(filepath.Join(tempDir1, "Test1.class"), []byte{}, 0o644)
+	err = os.WriteFile(filepath.Join(tempDir1, "Test1.class"), []byte{}, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Create class files in second directory
-	err = os.WriteFile(filepath.Join(tempDir2, "Test2.class"), []byte{}, 0o644)
+	err = os.WriteFile(filepath.Join(tempDir2, "Test2.class"), []byte{}, 0o600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,7 +456,7 @@ func TestEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }()
 
 		// Create subdirectory with no permissions
 		restrictedDir := filepath.Join(tempDir, "restricted")
@@ -476,10 +479,10 @@ func TestEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer os.Remove(tempFile.Name())
+		defer func() { _ = os.Remove(tempFile.Name()) }()
 
 		// Write minimal data (less than 100 bytes)
-		err = os.WriteFile(tempFile.Name(), []byte("tiny"), 0o644)
+		err = os.WriteFile(tempFile.Name(), []byte("tiny"), 0o600)
 		if err != nil {
 			t.Fatal(err)
 		}

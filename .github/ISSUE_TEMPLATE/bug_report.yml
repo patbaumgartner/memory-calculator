@@ -48,7 +48,7 @@ body:
         - Architecture: [e.g., amd64, arm64]
         - Memory Calculator Version: [e.g., v1.0.0]
         - Container Runtime: [e.g., Docker, Podman, none]
-        - Go Version (if building from source): [e.g., 1.24.5]
+        - Go Version (if building from source): [e.g., 1.25.5]
     validations:
       required: true
 

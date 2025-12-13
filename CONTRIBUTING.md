@@ -25,7 +25,7 @@ This project follows a simple code of conduct:
 
 ### Prerequisites
 
-- Go 1.24.5 or later
+- Go 1.25.5 or later
 - Git
 - Make (optional, but recommended)
 

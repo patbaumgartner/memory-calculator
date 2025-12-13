@@ -69,7 +69,7 @@ func (f *Formatter) DisplayVersion(cfg *config.Config) {
 	fmt.Printf("Version: %s\n", cfg.BuildVersion)
 	fmt.Printf("Build Time: %s\n", cfg.BuildTime)
 	fmt.Printf("Commit: %s\n", cfg.CommitHash)
-	fmt.Printf("Go Version: %s\n", "1.24.5")
+	fmt.Printf("Go Version: %s\n", "1.25.5")
 }
 
 // DisplayHelp shows help information.

@@ -16,6 +16,7 @@
 
 // Original file copied from https://github.com/paketo-buildpacks/libjvm/blob/main/helper/memory_calculator.go
 
+// Package calculator calculates JVM memory settings based on total memory and other constraints.
 package calculator
 
 import (
@@ -31,16 +32,25 @@ import (
 )
 
 const (
-	ClassLoadFactor          = 0.35
-	DefaultHeadroom          = 0
+	// ClassLoadFactor is the percentage of classes loaded (35%).
+	ClassLoadFactor = 0.35
+	// DefaultHeadroom is the default percentage of memory to leave for the OS.
+	DefaultHeadroom = 0
+	// DefaultMemoryLimitPathV1 is the path to the cgroup v1 memory limit file.
 	DefaultMemoryLimitPathV1 = "/sys/fs/cgroup/memory/memory.limit_in_bytes"
+	// DefaultMemoryLimitPathV2 is the path to the cgroup v2 memory limit file.
 	DefaultMemoryLimitPathV2 = "/sys/fs/cgroup/memory.max"
-	DefaultMemoryInfoPath    = "/proc/meminfo"
-	DefaultThreadCount       = 250
-	MaxJVMSize               = 64 * calc.Tebi
-	UnsetTotalMemory         = int64(9_223_372_036_854_771_712)
+	// DefaultMemoryInfoPath is the path to /proc/meminfo.
+	DefaultMemoryInfoPath = "/proc/meminfo"
+	// DefaultThreadCount is the default thread count (250).
+	DefaultThreadCount = 250
+	// MaxJVMSize is the maximum size of the JVM.
+	MaxJVMSize = 64 * calc.Tebi
+	// UnsetTotalMemory is the default value for unset total memory.
+	UnsetTotalMemory = int64(9_223_372_036_854_771_712)
 )
 
+// MemoryCalculator calculates JVM memory configuration.
 type MemoryCalculator struct {
 	Logger            *logger.Logger
 	MemoryLimitPathV1 string
@@ -48,6 +58,7 @@ type MemoryCalculator struct {
 	MemoryInfoPath    string
 }
 
+// Create creates a new MemoryCalculator.
 func Create(quiet bool) *MemoryCalculator {
 	return &MemoryCalculator{
 		Logger:            logger.Create(quiet),
@@ -57,6 +68,7 @@ func Create(quiet bool) *MemoryCalculator {
 	}
 }
 
+// Execute performs the memory calculation and returns environment variables.
 func (m MemoryCalculator) Execute() (map[string]string, error) {
 	c := calc.Calculator{
 		HeadRoom:    DefaultHeadroom,
@@ -129,7 +141,8 @@ func (m MemoryCalculator) getMemoryLimitFromPath(memoryLimitPath string) int64 {
 }
 
 func (m MemoryCalculator) parseMemoryString(memStr string) (int64, error) {
-	if size, err := calc.ParseSize(memStr); err != nil {
+	size, err := calc.ParseSize(memStr)
+	if err != nil {
 		// Try parsing with common suffixes
 		memStr = strings.TrimSpace(strings.ToUpper(memStr))
 
@@ -156,9 +169,8 @@ func (m MemoryCalculator) parseMemoryString(memStr string) (int64, error) {
 			}
 		}
 		return 0, err
-	} else {
-		return size.Value, nil
 	}
+	return size.Value, nil
 }
 
 func parseMemInfo(s string) (int64, error) {
@@ -196,26 +208,28 @@ func parseMemInfo(s string) (int64, error) {
 	return 0, fmt.Errorf("failed to find MemAvailable in meminfo")
 }
 
+// CountAgentClasses counts classes in agent JARs.
 func (m MemoryCalculator) CountAgentClasses(opts string) (int, error) {
 	var agentClassCount, skippedAgents int
-	if p, err := parser.ParseFlags(opts); err != nil {
+	p, err := parser.ParseFlags(opts)
+	if err != nil {
 		return 0, fmt.Errorf("unable to parse $JAVA_TOOL_OPTIONS\n%w", err)
-	} else {
-		var agentPaths []string
-		for _, s := range p {
-			if strings.HasPrefix(s, "-javaagent:") {
-				agentPaths = append(agentPaths, strings.Split(s, ":")[1])
-			}
+	}
+
+	var agentPaths []string
+	for _, s := range p {
+		if strings.HasPrefix(s, "-javaagent:") {
+			agentPaths = append(agentPaths, strings.Split(s, ":")[1])
 		}
-		if len(agentPaths) > 0 {
-			agentClassCount, skippedAgents, err = count.JarClassesFrom(agentPaths...)
-			if err != nil {
-				return 0, fmt.Errorf("error counting agent jar classes \n%w", err)
-			} else if skippedAgents > 0 {
-				m.Logger.Infof(
-					`WARNING: could not count classes from all agent jars (skipped %d), `+
-						`class count and metaspace may not be sized correctly`, skippedAgents)
-			}
+	}
+	if len(agentPaths) > 0 {
+		agentClassCount, skippedAgents, err = count.JarClassesFrom(agentPaths...)
+		if err != nil {
+			return 0, fmt.Errorf("error counting agent jar classes \n%w", err)
+		} else if skippedAgents > 0 {
+			m.Logger.Infof(
+				`WARNING: could not count classes from all agent jars (skipped %d), `+
+					`class count and metaspace may not be sized correctly`, skippedAgents)
 		}
 	}
 	return agentClassCount, nil

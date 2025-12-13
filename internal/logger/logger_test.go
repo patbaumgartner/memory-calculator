@@ -45,11 +45,11 @@ func TestInfoLogging(t *testing.T) {
 	testMessage := "test info message"
 	logger.Info(testMessage)
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	if !strings.Contains(output, testMessage) {
@@ -67,11 +67,11 @@ func TestInfoLoggingQuiet(t *testing.T) {
 	testMessage := "test info message"
 	logger.Info(testMessage)
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	if strings.Contains(output, testMessage) {
@@ -88,11 +88,11 @@ func TestInfofLogging(t *testing.T) {
 	logger := Create(false)
 	logger.Infof("test formatted message: %d", 42)
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	expectedMessage := "test formatted message: 42"
@@ -111,11 +111,11 @@ func TestDebugLogging(t *testing.T) {
 	testMessage := "test debug message"
 	logger.Debug(testMessage)
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	if !strings.Contains(output, testMessage) {
@@ -132,11 +132,11 @@ func TestDebugfLogging(t *testing.T) {
 	logger := Create(false)
 	logger.Debugf("debug formatted message: %s", "test")
 
-	w.Close()
+	_ = w.Close()
 	os.Stderr = oldStderr
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 
 	expectedMessage := "debug formatted message: test"

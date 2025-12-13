@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// MemoryRegions holds all the configured memory regions for calculation.
 type MemoryRegions struct {
 	DirectMemory      DirectMemory
 	HeadRoom          *HeadRoom
@@ -14,6 +15,7 @@ type MemoryRegions struct {
 	Stack             Stack
 }
 
+// FixedRegionsSize calculates the size of fixed memory regions (Direct, Metaspace, CodeCache, Stack).
 func (m MemoryRegions) FixedRegionsSize(threadCount int) (Size, error) {
 	if m.Metaspace == nil {
 		return Size{}, fmt.Errorf("unable to calculate fixed regions size without metaspace")
@@ -26,6 +28,7 @@ func (m MemoryRegions) FixedRegionsSize(threadCount int) (Size, error) {
 	}, nil
 }
 
+// FixedRegionsString returns a string representation of fixed regions.
 func (m MemoryRegions) FixedRegionsString(threadCount int) string {
 	var s []string
 
@@ -39,6 +42,7 @@ func (m MemoryRegions) FixedRegionsString(threadCount int) string {
 	return strings.Join(s, ", ")
 }
 
+// NonHeapRegionsSize calculates the size of all non-heap regions (Fixed + HeadRoom).
 func (m MemoryRegions) NonHeapRegionsSize(threadCount int) (Size, error) {
 	if m.HeadRoom == nil {
 		return Size{}, fmt.Errorf("unable to calculate non-heap regions size without headroom")
@@ -55,6 +59,7 @@ func (m MemoryRegions) NonHeapRegionsSize(threadCount int) (Size, error) {
 	}, nil
 }
 
+// NonHeapRegionsString returns a string representation of non-heap regions.
 func (m MemoryRegions) NonHeapRegionsString(threadCount int) string {
 	var s []string
 
@@ -66,6 +71,7 @@ func (m MemoryRegions) NonHeapRegionsString(threadCount int) string {
 	return strings.Join(s, ", ")
 }
 
+// AllRegionsSize calculates the total size of all memory regions.
 func (m MemoryRegions) AllRegionsSize(threadCount int) (Size, error) {
 	if m.Heap == nil {
 		return Size{}, fmt.Errorf("unable to calculate all regions size without heap")
@@ -82,6 +88,7 @@ func (m MemoryRegions) AllRegionsSize(threadCount int) (Size, error) {
 	}, nil
 }
 
+// AllRegionsString returns a string representation of all regions.
 func (m MemoryRegions) AllRegionsString(threadCount int) string {
 	var s []string
 

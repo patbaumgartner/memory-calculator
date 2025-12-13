@@ -37,7 +37,7 @@ Please describe the tests that you ran to verify your changes:
 
 ### Test Configuration
 - OS: [e.g., Linux, macOS]
-- Go Version: [e.g., 1.24.5]
+- Go Version: [e.g., 1.25.5]
 - Architecture: [e.g., amd64, arm64]
 
 ## Screenshots (if applicable)

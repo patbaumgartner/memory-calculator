@@ -11,12 +11,13 @@ import (
 func TestMainIntegration(t *testing.T) {
 	// Build the binary for testing
 	binaryPath := filepath.Join(os.TempDir(), "memory-calculator-test")
+	//nolint:gosec // Safe in tests
 	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
 	cmd.Dir = "./"
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove(binaryPath)
+	defer func() { _ = os.Remove(binaryPath) }()
 
 	tests := []struct {
 		name           string
@@ -44,7 +45,7 @@ func TestMainIntegration(t *testing.T) {
 				"Version:",
 				"Build Time:",
 				"Commit:",
-				"Go Version: 1.24.5",
+				"Go Version: 1.25.5",
 			},
 		},
 		{
@@ -125,6 +126,7 @@ func TestMainIntegration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:gosec // Safe in tests
 			cmd := exec.Command(binaryPath, tt.args...)
 			// Set environment variables for testing
 			env := append(os.Environ(),
@@ -177,13 +179,15 @@ func TestMainIntegration(t *testing.T) {
 func TestMainEnvironmentVariables(t *testing.T) {
 	// Build the binary for testing
 	binaryPath := filepath.Join(os.TempDir(), "memory-calculator-test")
+	//nolint:gosec // Safe in tests
 	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove(binaryPath)
+	defer func() { _ = os.Remove(binaryPath) }()
 
 	// Test with environment variables
+	//nolint:gosec // Safe in tests
 	cmd = exec.Command(binaryPath, "--total-memory", "4G")
 	cmd.Env = append(os.Environ(),
 		"BPI_APPLICATION_PATH=.",
@@ -214,11 +218,12 @@ func TestMainEnvironmentVariables(t *testing.T) {
 func TestMainBoundaryValues(t *testing.T) {
 	// Build the binary for testing
 	binaryPath := filepath.Join(os.TempDir(), "memory-calculator-test")
+	//nolint:gosec // Safe in tests
 	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove(binaryPath)
+	defer func() { _ = os.Remove(binaryPath) }()
 
 	tests := []struct {
 		name        string
@@ -273,6 +278,7 @@ func TestMainBoundaryValues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:gosec // Safe in tests
 			cmd := exec.Command(binaryPath, tt.args...)
 			// Set environment variables for testing
 			cmd.Env = append(os.Environ(),
@@ -294,14 +300,69 @@ func TestMainBoundaryValues(t *testing.T) {
 	}
 }
 
+// hasQuietFlag checks if --quiet flag is present in args
+func hasQuietFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "--quiet" {
+			return true
+		}
+	}
+	return false
+}
+
+// hasManualMemoryFlag checks if manual memory (2G) is specified in args
+func hasManualMemoryFlag(args []string) bool {
+	for _, arg := range args {
+		if arg == "2G" {
+			return true
+		}
+	}
+	return false
+}
+
+// validateMemoryDetectionOutput validates the output based on quiet and manual memory flags
+func validateMemoryDetectionOutput(t *testing.T, outputStr string, hasQuiet, hasManualMemory bool) {
+	t.Helper()
+
+	if !hasQuiet {
+		// Should contain memory detection message
+		if !strings.Contains(outputStr, "Calculating JVM memory") &&
+			!strings.Contains(outputStr, "Using specified memory") {
+			t.Errorf("Expected memory detection message in output. Got: %s", outputStr)
+		}
+
+		if hasManualMemory {
+			// Manual override should show "Using specified memory: 2G"
+			if !strings.Contains(outputStr, "Using specified memory: 2G") {
+				t.Errorf("Expected manual memory setting (Using specified memory: 2G) in output. Got: %s", outputStr)
+			}
+		} else {
+			// Auto-detection should show some positive memory value
+			if !strings.Contains(outputStr, "Calculating JVM memory based on") {
+				t.Errorf("Expected auto-detected memory value in output. Got: %s", outputStr)
+			}
+		}
+	}
+
+	// All outputs should contain JVM options
+	if !strings.Contains(outputStr, "-Xmx") {
+		t.Errorf("Expected JVM max heap option (-Xmx) in output. Got: %s", outputStr)
+	}
+
+	if !hasQuiet && !strings.Contains(outputStr, "JAVA_TOOL_OPTIONS") {
+		t.Errorf("Expected JAVA_TOOL_OPTIONS in output. Got: %s", outputStr)
+	}
+}
+
 func TestMainHostMemoryDetection(t *testing.T) {
 	// Build the binary for testing
 	binaryPath := filepath.Join(t.TempDir(), "memory-calculator")
+	//nolint:gosec // Safe in tests
 	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove(binaryPath)
+	defer func() { _ = os.Remove(binaryPath) }()
 
 	tests := []struct {
 		name        string
@@ -327,6 +388,7 @@ func TestMainHostMemoryDetection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			//nolint:gosec // Safe in tests
 			cmd := exec.Command(binaryPath, tt.args...)
 			cmd.Env = append(os.Environ(),
 				"BPI_APPLICATION_PATH=.",
@@ -341,51 +403,8 @@ func TestMainHostMemoryDetection(t *testing.T) {
 
 			outputStr := string(output)
 
-			// Verify output contains memory detection message (unless quiet mode)
-			hasQuiet := false
-			for _, arg := range tt.args {
-				if arg == "--quiet" {
-					hasQuiet = true
-					break
-				}
-			}
-
-			if !hasQuiet {
-				// Should contain memory detection message
-				if !strings.Contains(outputStr, "Calculating JVM memory") && !strings.Contains(outputStr, "Using specified memory") {
-					t.Errorf("Expected memory detection message in output. Got: %s", outputStr)
-				}
-
-				// Check if manual override was used
-				hasManualMemory := false
-				for _, arg := range tt.args {
-					if arg == "2G" {
-						hasManualMemory = true
-						break
-					}
-				}
-
-				if hasManualMemory {
-					// Manual override should show "Using specified memory: 2G"
-					if !strings.Contains(outputStr, "Using specified memory: 2G") {
-						t.Errorf("Expected manual memory setting (Using specified memory: 2G) in output. Got: %s", outputStr)
-					}
-				} else {
-					// Auto-detection should show some positive memory value
-					if !strings.Contains(outputStr, "Calculating JVM memory based on") {
-						t.Errorf("Expected auto-detected memory value in output. Got: %s", outputStr)
-					}
-				}
-			}
-
-			// All outputs should contain JVM options
-			if !strings.Contains(outputStr, "-Xmx") {
-				t.Errorf("Expected JVM max heap option (-Xmx) in output. Got: %s", outputStr)
-			}
-
-			if !hasQuiet && !strings.Contains(outputStr, "JAVA_TOOL_OPTIONS") {
-				t.Errorf("Expected JAVA_TOOL_OPTIONS in output. Got: %s", outputStr)
-			}
+			// Verify output using helper function
+			validateMemoryDetectionOutput(t, outputStr, hasQuietFlag(tt.args), hasManualMemoryFlag(tt.args))
 		})
 	}
 }
@@ -394,14 +413,16 @@ func TestMainHostMemoryDetection(t *testing.T) {
 func BenchmarkMainExecution(b *testing.B) {
 	// Build the binary for testing
 	binaryPath := filepath.Join(os.TempDir(), "memory-calculator-bench")
+	//nolint:gosec // Safe in tests
 	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
 	if err := cmd.Run(); err != nil {
 		b.Fatalf("Failed to build binary: %v", err)
 	}
-	defer os.Remove(binaryPath)
+	defer func() { _ = os.Remove(binaryPath) }()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
+		//nolint:gosec // Safe in tests
 		cmd := exec.Command(binaryPath, "--total-memory", "2G", "--quiet")
 		// Set environment variables for testing
 		cmd.Env = append(os.Environ(),

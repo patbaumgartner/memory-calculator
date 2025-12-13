@@ -1,5 +1,6 @@
 //go:build !minimal
 
+// Package count provides utilities for counting classes in JARs and directories.
 package count
 
 import (
@@ -14,21 +15,22 @@ import (
 	"strings"
 )
 
+// ClassExtensions lists the file extensions considered as class files.
 var ClassExtensions = []string{".class", ".classdata", ".clj", ".groovy", ".kts"}
 
 // Classes counts class files in the given path. It first checks for a modules file (Java 9+)
 // and falls back to counting JAR files for older Java versions.
 func Classes(path string) (int, error) {
 	file := filepath.Join(path, "lib", "modules")
-	if _, err := os.Stat(file); err != nil && !os.IsNotExist(err) {
+	_, err := os.Stat(file)
+	if err != nil && !os.IsNotExist(err) {
 		return 0, fmt.Errorf("unable to stat %s\n%w", file, err)
 	} else if os.IsNotExist(err) {
 		return JarClasses(path)
-	} else {
-		// For Java 9+ with modules, we'll use a simple estimate based on typical module sizes
-		// since implementing the full module reader would be complex
-		return estimateModuleClasses(file)
 	}
+	// For Java 9+ with modules, we'll use a simple estimate based on typical module sizes
+	// since implementing the full module reader would be complex
+	return estimateModuleClasses(file)
 }
 
 // estimateModuleClasses provides an estimate of classes in a modules file
@@ -84,7 +86,7 @@ func JarClasses(path string) (int, error) {
 				return nil
 			}
 		}
-		defer z.Close()
+		defer func() { _ = z.Close() }()
 
 		for _, f := range z.File {
 			if strings.HasSuffix(f.FileInfo().Name(), ".jar") {
@@ -142,7 +144,7 @@ func nestedJarContents(jarFile *zip.File) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("unable to open nested jar\n%w", err)
 	}
-	defer reader.Close()
+	defer func() { _ = reader.Close() }()
 
 	var b bytes.Buffer
 	// Limit decompression to prevent DoS attacks (100MB limit)
@@ -160,9 +162,8 @@ func nestedJarContents(jarFile *zip.File) (int, error) {
 	if err != nil {
 		if !(errors.Is(err, zip.ErrFormat)) {
 			return 0, fmt.Errorf("error reading nested Jar contents\n%w", err)
-		} else {
-			return 0, nil
 		}
+		return 0, nil
 	}
 	for _, nestedJar := range nj.File {
 		count += jarContents(nestedJar)

@@ -7,11 +7,11 @@ import (
 
 func TestLoad(t *testing.T) {
 	// Clear any existing environment variables
-	os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
-	os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
-	os.Unsetenv("BPL_JVM_THREAD_COUNT")
-	os.Unsetenv("BPL_JVM_HEAD_ROOM")
-	os.Unsetenv("BPI_APPLICATION_PATH")
+	_ = os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
+	_ = os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+	_ = os.Unsetenv("BPL_JVM_THREAD_COUNT")
+	_ = os.Unsetenv("BPL_JVM_HEAD_ROOM")
+	_ = os.Unsetenv("BPI_APPLICATION_PATH")
 
 	cfg := Load()
 
@@ -39,16 +39,16 @@ func TestLoad(t *testing.T) {
 
 func TestLoadWithEnvironmentVariables(t *testing.T) {
 	// Set environment variables
-	os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "15000")
-	os.Setenv("BPL_JVM_THREAD_COUNT", "500")
-	os.Setenv("BPL_JVM_HEAD_ROOM", "10")
-	os.Setenv("BPI_APPLICATION_PATH", "/custom/app")
+	_ = os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "15000")
+	_ = os.Setenv("BPL_JVM_THREAD_COUNT", "500")
+	_ = os.Setenv("BPL_JVM_HEAD_ROOM", "10")
+	_ = os.Setenv("BPI_APPLICATION_PATH", "/custom/app")
 
 	defer func() {
-		os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
-		os.Unsetenv("BPL_JVM_THREAD_COUNT")
-		os.Unsetenv("BPL_JVM_HEAD_ROOM")
-		os.Unsetenv("BPI_APPLICATION_PATH")
+		_ = os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+		_ = os.Unsetenv("BPL_JVM_THREAD_COUNT")
+		_ = os.Unsetenv("BPL_JVM_HEAD_ROOM")
+		_ = os.Unsetenv("BPI_APPLICATION_PATH")
 	}()
 
 	cfg := Load()
@@ -202,10 +202,10 @@ func TestSetEnvironmentVariables(t *testing.T) {
 	}
 
 	// Clean up
-	os.Unsetenv("BPL_JVM_THREAD_COUNT")
-	os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
-	os.Unsetenv("BPL_JVM_HEAD_ROOM")
-	os.Unsetenv("BPI_APPLICATION_PATH")
+	_ = os.Unsetenv("BPL_JVM_THREAD_COUNT")
+	_ = os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+	_ = os.Unsetenv("BPL_JVM_HEAD_ROOM")
+	_ = os.Unsetenv("BPI_APPLICATION_PATH")
 }
 
 func TestSetTotalMemory(t *testing.T) {
@@ -218,7 +218,7 @@ func TestSetTotalMemory(t *testing.T) {
 	}
 
 	// Clean up
-	os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
+	_ = os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
 
 	// Test with zero memory (should not set env var)
 	cfg.SetTotalMemory(0)

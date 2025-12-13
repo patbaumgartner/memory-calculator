@@ -24,34 +24,31 @@ func TestBuildConstraints(t *testing.T) {
 		{"Stack invalid", "-XX:ThreadStackSize=2M", false},
 	}
 
+	// Map of matcher functions for each type
+	matchers := map[string]func(string) bool{
+		"DirectMemory":      matchDirectMemory,
+		"Heap":              matchHeap,
+		"Metaspace":         matchMetaspace,
+		"ReservedCodeCache": matchReservedCodeCache,
+		"Stack":             matchStack,
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Test match functions
-			switch {
-			case matchDirectMemory(tt.flag):
-				if !tt.wantMatch || !matchDirectMemory(tt.flag) {
-					t.Errorf("matchDirectMemory(%q) = %v, want %v", tt.flag, true, tt.wantMatch)
+			// Check which matcher matches the flag
+			matched := false
+			for name, matchFunc := range matchers {
+				if matchFunc(tt.flag) {
+					matched = true
+					if !tt.wantMatch {
+						t.Errorf("%s matcher matched %q, but expected no match", name, tt.flag)
+					}
+					break
 				}
-			case matchHeap(tt.flag):
-				if !tt.wantMatch || !matchHeap(tt.flag) {
-					t.Errorf("matchHeap(%q) = %v, want %v", tt.flag, true, tt.wantMatch)
-				}
-			case matchMetaspace(tt.flag):
-				if !tt.wantMatch || !matchMetaspace(tt.flag) {
-					t.Errorf("matchMetaspace(%q) = %v, want %v", tt.flag, true, tt.wantMatch)
-				}
-			case matchReservedCodeCache(tt.flag):
-				if !tt.wantMatch || !matchReservedCodeCache(tt.flag) {
-					t.Errorf("matchReservedCodeCache(%q) = %v, want %v", tt.flag, true, tt.wantMatch)
-				}
-			case matchStack(tt.flag):
-				if !tt.wantMatch || !matchStack(tt.flag) {
-					t.Errorf("matchStack(%q) = %v, want %v", tt.flag, true, tt.wantMatch)
-				}
-			default:
-				if tt.wantMatch {
-					t.Errorf("No match function returned true for %q, but expected match", tt.flag)
-				}
+			}
+
+			if !matched && tt.wantMatch {
+				t.Errorf("No match function returned true for %q, but expected match", tt.flag)
 			}
 		})
 	}

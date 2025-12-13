@@ -103,12 +103,12 @@ Buffers:          123456 kB`,
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			if _, err := tmpFile.WriteString(tt.memInfoContent); err != nil {
 				t.Fatalf("Failed to write to temp file: %v", err)
 			}
-			tmpFile.Close()
+			_ = tmpFile.Close()
 
 			// Test with custom path
 			detector := CreateWithPath(tmpFile.Name())
@@ -198,12 +198,12 @@ MemAvailable:    2345678 kB`
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(memInfoContent); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	detector := CreateWithPath(tmpFile.Name())
 
@@ -291,12 +291,12 @@ MemAvailable:   33554432 kB`,
 			if err != nil {
 				t.Fatalf("Failed to create temp file: %v", err)
 			}
-			defer os.Remove(tmpFile.Name())
+			defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 			if _, err := tmpFile.WriteString(tt.memInfoContent); err != nil {
 				t.Fatalf("Failed to write to temp file: %v", err)
 			}
-			tmpFile.Close()
+			_ = tmpFile.Close()
 
 			detector := CreateWithPath(tmpFile.Name())
 			memory := detector.detectLinuxMemory()

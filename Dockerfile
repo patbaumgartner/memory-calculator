@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.5-alpine3.21 AS builder
 
 # Install build dependencies
 RUN apk add --no-cache \
@@ -78,9 +78,9 @@ CMD ["--help"]
 
 # Metadata
 LABEL maintainer="Patrick Baumgartner <contact@patbaumgartner.com>" \
-      description="JVM Memory Calculator for Container Environments" \
-      version="${VERSION}" \
-      build.time="${BUILD_TIME}" \
-      build.commit="${COMMIT_HASH}" \
-      alpine.version="3.20" \
-      go.version="1.24.5"
+    description="JVM Memory Calculator for Container Environments" \
+    version="${VERSION}" \
+    build.time="${BUILD_TIME}" \
+    build.commit="${COMMIT_HASH}" \
+    alpine.version="3.20" \
+    go.version="1.25.5"

@@ -746,7 +746,7 @@ pack build my-app \
 
 ```dockerfile
 # Multi-stage build with memory calculator
-FROM golang:1.24-alpine AS calculator-builder
+FROM golang:1.25-alpine AS calculator-builder
 WORKDIR /src
 COPY . .
 RUN make build-minimal

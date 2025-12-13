@@ -4,6 +4,54 @@ import (
 	"testing"
 )
 
+// validateCalculationResult validates the basic structure of a calculation result
+func validateCalculationResult(t *testing.T, result MemoryRegions) {
+	t.Helper()
+
+	if result.DirectMemory.Value <= 0 {
+		t.Error("DirectMemory should have positive value")
+	}
+	if result.ReservedCodeCache.Value <= 0 {
+		t.Error("ReservedCodeCache should have positive value")
+	}
+	if result.Stack.Value <= 0 {
+		t.Error("Stack should have positive value")
+	}
+	if result.Metaspace == nil {
+		t.Error("Metaspace should not be nil")
+	}
+	if result.HeadRoom == nil {
+		t.Error("HeadRoom should not be nil")
+	}
+	if result.Heap != nil && result.Heap.Value <= 0 {
+		t.Error("Heap value should be positive")
+	}
+}
+
+// validateMemoryBounds validates that total memory used doesn't exceed available memory
+func validateMemoryBounds(t *testing.T, result MemoryRegions, totalMemory int64, threadCount int) {
+	t.Helper()
+
+	if result.Heap == nil {
+		return
+	}
+
+	totalUsed := result.Heap.Value
+	if result.HeadRoom != nil {
+		totalUsed += result.HeadRoom.Value
+	}
+	if result.Metaspace != nil {
+		totalUsed += result.Metaspace.Value
+	}
+	totalUsed += result.DirectMemory.Value
+	totalUsed += result.ReservedCodeCache.Value
+	totalUsed += result.Stack.Value * int64(threadCount)
+
+	if totalUsed > totalMemory {
+		t.Errorf("Total memory used (%d) exceeds available memory (%d)", totalUsed, totalMemory)
+	}
+}
+
 func TestCalculatorCalculate(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -229,45 +277,9 @@ func TestCalculatorCalculate(t *testing.T) {
 				return
 			}
 
-			// Validate the result structure
-			if result.DirectMemory.Value <= 0 {
-				t.Error("DirectMemory should have positive value")
-			}
-			if result.ReservedCodeCache.Value <= 0 {
-				t.Error("ReservedCodeCache should have positive value")
-			}
-			if result.Stack.Value <= 0 {
-				t.Error("Stack should have positive value")
-			}
-			if result.Metaspace == nil {
-				t.Error("Metaspace should not be nil")
-			}
-			if result.HeadRoom == nil {
-				t.Error("HeadRoom should not be nil")
-			}
-
-			// Validate calculated heap
-			if result.Heap != nil && result.Heap.Value <= 0 {
-				t.Error("Heap value should be positive")
-			}
-
-			// Validate memory calculations don't exceed total
-			if result.Heap != nil {
-				totalUsed := result.Heap.Value
-				if result.HeadRoom != nil {
-					totalUsed += result.HeadRoom.Value
-				}
-				if result.Metaspace != nil {
-					totalUsed += result.Metaspace.Value
-				}
-				totalUsed += result.DirectMemory.Value
-				totalUsed += result.ReservedCodeCache.Value
-				totalUsed += result.Stack.Value * int64(tt.calculator.ThreadCount)
-
-				if totalUsed > tt.calculator.TotalMemory.Value {
-					t.Errorf("Total memory used (%d) exceeds available memory (%d)", totalUsed, tt.calculator.TotalMemory.Value)
-				}
-			}
+			// Validate the result structure using helper functions
+			validateCalculationResult(t, result)
+			validateMemoryBounds(t, result, tt.calculator.TotalMemory.Value, tt.calculator.ThreadCount)
 		})
 	}
 }
@@ -300,7 +312,8 @@ func TestCalculatorEdgeCases(t *testing.T) {
 			TotalMemory:      Size{Value: 4 * Gibi},
 		}
 
-		flags := `-server -Xmx2g -Xms1g -XX:MaxMetaspaceSize=512m -XX:MaxDirectMemorySize=256m -XX:ReservedCodeCacheSize=128m -Xss1m -XX:+UseG1GC -XX:G1HeapRegionSize=16m`
+		flags := `-server -Xmx2g -Xms1g -XX:MaxMetaspaceSize=512m -XX:MaxDirectMemorySize=256m ` +
+			`-XX:ReservedCodeCacheSize=128m -Xss1m -XX:+UseG1GC -XX:G1HeapRegionSize=16m`
 		result, err := calc.Calculate(flags)
 		if err != nil {
 			t.Errorf("Should handle complex JVM flags: %v", err)

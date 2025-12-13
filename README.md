@@ -165,7 +165,7 @@ make build-alpine-all  # All Alpine architectures
 
 ```dockerfile
 # Alpine multi-stage build
-FROM golang:1.24-alpine3.20 as builder
+FROM golang:1.25-alpine3.20 as builder
 COPY . /build
 WORKDIR /build
 RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o memory-calculator ./cmd/memory-calculator
@@ -387,7 +387,7 @@ Run tests: `make test` | Coverage: `make coverage` | Benchmarks: `make benchmark
 
 ### Prerequisites
 
-- Go 1.24.5 or later
+- Go 1.25.5 or later
 - Git
 
 ### Setup Development Environment

@@ -135,7 +135,7 @@ ENTRYPOINT ["/startup.sh"]
 ### Multi-Stage Build
 ```dockerfile
 # Build stage - compile memory calculator
-FROM golang:1.24.5 as calculator-builder
+FROM golang:1.25.5 as calculator-builder
 WORKDIR /build
 COPY . .
 RUN make build-minimal

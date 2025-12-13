@@ -85,7 +85,7 @@ func TestReadCgroupsV2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	tests := []struct {
 		name        string
@@ -139,7 +139,7 @@ func TestReadCgroupsV2(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tempDir, "memory.max")
 			if tt.fileContent != "" {
-				err := os.WriteFile(testFile, []byte(tt.fileContent), 0o644)
+				err := os.WriteFile(testFile, []byte(tt.fileContent), 0o600)
 				if err != nil {
 					t.Fatalf("Failed to write test file: %v", err)
 				}
@@ -171,7 +171,7 @@ func TestReadCgroupsV2(t *testing.T) {
 			}
 
 			// Clean up test file
-			os.Remove(testFile)
+			_ = os.Remove(testFile)
 		})
 	}
 }
@@ -182,7 +182,7 @@ func TestReadCgroupsV1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	tests := []struct {
 		name        string
@@ -230,7 +230,7 @@ func TestReadCgroupsV1(t *testing.T) {
 			// Create test file
 			testFile := filepath.Join(tempDir, "memory.limit_in_bytes")
 			if tt.fileContent != "" {
-				err := os.WriteFile(testFile, []byte(tt.fileContent), 0o644)
+				err := os.WriteFile(testFile, []byte(tt.fileContent), 0o600)
 				if err != nil {
 					t.Fatalf("Failed to write test file: %v", err)
 				}
@@ -262,7 +262,7 @@ func TestReadCgroupsV1(t *testing.T) {
 			}
 
 			// Clean up test file
-			os.Remove(testFile)
+			_ = os.Remove(testFile)
 		})
 	}
 }
@@ -273,7 +273,7 @@ func TestDetectContainerMemory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	tests := []struct {
 		name          string
@@ -332,14 +332,14 @@ func TestDetectContainerMemory(t *testing.T) {
 
 			// Create test files if needed
 			if tt.createV2File {
-				err := os.WriteFile(v2File, []byte(tt.v2FileContent), 0o644)
+				err := os.WriteFile(v2File, []byte(tt.v2FileContent), 0o600)
 				if err != nil {
 					t.Fatalf("Failed to write V2 test file: %v", err)
 				}
 			}
 
 			if tt.createV1File {
-				err := os.WriteFile(v1File, []byte(tt.v1FileContent), 0o644)
+				err := os.WriteFile(v1File, []byte(tt.v1FileContent), 0o600)
 				if err != nil {
 					t.Fatalf("Failed to write V1 test file: %v", err)
 				}
@@ -353,8 +353,8 @@ func TestDetectContainerMemory(t *testing.T) {
 			}
 
 			// Clean up test files
-			os.Remove(v2File)
-			os.Remove(v1File)
+			_ = os.Remove(v2File)
+			_ = os.Remove(v1File)
 		})
 	}
 }
@@ -365,7 +365,7 @@ func TestDetectContainerMemoryWithHostFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	tests := []struct {
 		name               string
@@ -436,14 +436,14 @@ MemAvailable:    2345678 kB`,
 
 			// Create cgroups test files if needed
 			if tt.createV2File {
-				err := os.WriteFile(v2File, []byte(tt.v2FileContent), 0o644)
+				err := os.WriteFile(v2File, []byte(tt.v2FileContent), 0o600)
 				if err != nil {
 					t.Fatalf("Failed to write V2 test file: %v", err)
 				}
 			}
 
 			if tt.createV1File {
-				err := os.WriteFile(v1File, []byte(tt.v1FileContent), 0o644)
+				err := os.WriteFile(v1File, []byte(tt.v1FileContent), 0o600)
 				if err != nil {
 					t.Fatalf("Failed to write V1 test file: %v", err)
 				}
@@ -451,7 +451,7 @@ MemAvailable:    2345678 kB`,
 
 			// Create host meminfo file if needed
 			if tt.createHostMemInfo {
-				err := os.WriteFile(hostMemInfoFile, []byte(tt.hostMemInfoContent), 0o644)
+				err := os.WriteFile(hostMemInfoFile, []byte(tt.hostMemInfoContent), 0o600)
 				if err != nil {
 					t.Fatalf("Failed to write host meminfo test file: %v", err)
 				}
@@ -468,9 +468,9 @@ MemAvailable:    2345678 kB`,
 			}
 
 			// Clean up test files
-			os.Remove(v2File)
-			os.Remove(v1File)
-			os.Remove(hostMemInfoFile)
+			_ = os.Remove(v2File)
+			_ = os.Remove(v1File)
+			_ = os.Remove(hostMemInfoFile)
 		})
 	}
 }
@@ -481,26 +481,26 @@ func TestHostFallbackPriority(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	v2File := filepath.Join(tempDir, "memory.max")
 	v1File := filepath.Join(tempDir, "memory.limit_in_bytes")
 	hostMemInfoFile := filepath.Join(tempDir, "meminfo")
 
 	// Create all files with different values
-	err = os.WriteFile(v2File, []byte("2147483648\n"), 0o644) // 2GB
+	err = os.WriteFile(v2File, []byte("2147483648\n"), 0o600) // 2GB
 	if err != nil {
 		t.Fatalf("Failed to write V2 test file: %v", err)
 	}
 
-	err = os.WriteFile(v1File, []byte("1073741824\n"), 0o644) // 1GB
+	err = os.WriteFile(v1File, []byte("1073741824\n"), 0o600) // 1GB
 	if err != nil {
 		t.Fatalf("Failed to write V1 test file: %v", err)
 	}
 
 	hostMemInfo := `MemTotal:        8062332 kB
 MemFree:         1234567 kB`
-	err = os.WriteFile(hostMemInfoFile, []byte(hostMemInfo), 0o644) // ~8GB
+	err = os.WriteFile(hostMemInfoFile, []byte(hostMemInfo), 0o600) // ~8GB
 	if err != nil {
 		t.Fatalf("Failed to write host meminfo test file: %v", err)
 	}
@@ -519,7 +519,8 @@ MemFree:         1234567 kB`
 
 func TestFileNotFound(t *testing.T) {
 	// Use a mock host detector that also can't find files
-	detector := CreateWithPathsAndHost("/nonexistent/v2/path", "/nonexistent/v1/path", host.CreateWithPath("/nonexistent/meminfo"))
+	detector := CreateWithPathsAndHost("/nonexistent/v2/path", "/nonexistent/v1/path",
+		host.CreateWithPath("/nonexistent/meminfo"))
 
 	// Should return 0 when files don't exist
 	result := detector.DetectContainerMemory()
@@ -542,10 +543,10 @@ func BenchmarkDetectContainerMemory(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	v2File := filepath.Join(tempDir, "memory.max")
-	err = os.WriteFile(v2File, []byte("2147483648\n"), 0o644)
+	err = os.WriteFile(v2File, []byte("2147483648\n"), 0o600)
 	if err != nil {
 		b.Fatalf("Failed to write test file: %v", err)
 	}

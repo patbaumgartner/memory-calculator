@@ -36,11 +36,11 @@ func TestDisplayVersion(t *testing.T) {
 
 	formatter.DisplayVersion(cfg)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	expectedParts := []string{
@@ -48,7 +48,7 @@ func TestDisplayVersion(t *testing.T) {
 		"Version: 1.0.0",
 		"Build Time: 2023-01-01_12:00:00",
 		"Commit: abc123",
-		"Go Version: 1.24.5",
+		"Go Version: 1.25.5",
 	}
 
 	for _, part := range expectedParts {
@@ -71,11 +71,11 @@ func TestDisplayHelp(t *testing.T) {
 
 	formatter.DisplayHelp(cfg)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	expectedParts := []string{
@@ -117,11 +117,11 @@ func TestDisplayResults(t *testing.T) {
 
 	formatter.DisplayResults(props, totalMemory, cfg)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	expectedParts := []string{
@@ -167,11 +167,11 @@ func TestDisplayResultsWithIndividualProps(t *testing.T) {
 
 	formatter.DisplayResults(props, totalMemory, cfg)
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	output := buf.String()
 
 	expectedParts := []string{
@@ -228,11 +228,11 @@ func TestDisplayQuietResults(t *testing.T) {
 
 			formatter.DisplayQuietResults(tt.props)
 
-			w.Close()
+			_ = w.Close()
 			os.Stdout = old
 
 			var buf bytes.Buffer
-			io.Copy(&buf, r)
+			_, _ = io.Copy(&buf, r)
 			output := buf.String()
 
 			if tt.name == "With individual flags" {
@@ -396,11 +396,11 @@ func TestDisplayJVMSetting(t *testing.T) {
 
 			formatter.displayJVMSetting(tt.props, tt.flag, tt.label)
 
-			w.Close()
+			_ = w.Close()
 			os.Stdout = old
 
 			var buf bytes.Buffer
-			io.Copy(&buf, r)
+			_, _ = io.Copy(&buf, r)
 			output := strings.TrimSpace(buf.String())
 
 			if output != tt.expected {

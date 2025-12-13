@@ -14,12 +14,12 @@ func TestMinimalBuildFunctionality(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Test 1: JarClasses should handle non-existent files gracefully
 	testJarPath := filepath.Join(tempDir, "test.jar")
 	testContent := []byte("fake jar content for size estimation")
-	err = os.WriteFile(testJarPath, testContent, 0o644)
+	err = os.WriteFile(testJarPath, testContent, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to create test jar: %v", err)
 	}
@@ -36,7 +36,7 @@ func TestMinimalBuildFunctionality(t *testing.T) {
 
 	// Test 2: JarClasses should return 0 for empty file
 	emptyJarPath := filepath.Join(tempDir, "empty.jar")
-	err = os.WriteFile(emptyJarPath, []byte{}, 0o644)
+	err = os.WriteFile(emptyJarPath, []byte{}, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to create empty jar: %v", err)
 	}
@@ -79,12 +79,12 @@ func TestMinimalBuildConsistency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Small JAR (should estimate fewer classes)
 	smallJar := filepath.Join(tempDir, "small.jar")
 	smallContent := make([]byte, 1024) // 1KB
-	err = os.WriteFile(smallJar, smallContent, 0o644)
+	err = os.WriteFile(smallJar, smallContent, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to create small jar: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestMinimalBuildConsistency(t *testing.T) {
 	// Large JAR (should estimate more classes)
 	largeJar := filepath.Join(tempDir, "large.jar")
 	largeContent := make([]byte, 10240) // 10KB
-	err = os.WriteFile(largeJar, largeContent, 0o644)
+	err = os.WriteFile(largeJar, largeContent, 0o600)
 	if err != nil {
 		t.Fatalf("Failed to create large jar: %v", err)
 	}

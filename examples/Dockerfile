@@ -2,7 +2,7 @@
 # Production-ready Dockerfile using memory calculator
 
 # Multi-stage build
-FROM golang:1.24-alpine AS calculator-builder
+FROM golang:1.25.5-alpine3.21 AS calculator-builder
 WORKDIR /build
 COPY . .
 RUN apk add --no-cache make && make build-minimal
@@ -24,7 +24,7 @@ RUN chmod +x /entrypoint.sh
 
 # Add non-root user for security
 RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+  adduser -u 1001 -S appuser -G appgroup
 USER appuser
 
 # Health check

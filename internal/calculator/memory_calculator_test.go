@@ -2,6 +2,7 @@ package calculator
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,20 +11,20 @@ import (
 
 func TestExecuteWithDefaultValues(t *testing.T) {
 	// Clear environment variables
-	os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
-	os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
-	os.Unsetenv("BPL_JVM_THREAD_COUNT")
+	_ = os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
+	_ = os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+	_ = os.Unsetenv("BPL_JVM_THREAD_COUNT")
 
 	// Create temporary directory for BPI_APPLICATION_PATH
 	tempDir, err := os.MkdirTemp("", "memory-calculator-test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Set app path to temp dir instead of default /app
-	os.Setenv("BPI_APPLICATION_PATH", tempDir)
-	defer os.Unsetenv("BPI_APPLICATION_PATH")
+	_ = os.Setenv("BPI_APPLICATION_PATH", tempDir)
+	defer func() { _ = os.Unsetenv("BPI_APPLICATION_PATH") }()
 
 	mc := Create(true) // quiet mode
 	result, err := mc.Execute()
@@ -45,13 +46,13 @@ func TestExecuteWithDefaultValues(t *testing.T) {
 
 func TestExecuteWithEnvironmentVariables(t *testing.T) {
 	// Set environment variables
-	os.Setenv("BPL_JVM_TOTAL_MEMORY", "1G")
-	os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "5000")
-	os.Setenv("BPL_JVM_THREAD_COUNT", "300")
+	_ = os.Setenv("BPL_JVM_TOTAL_MEMORY", "1G")
+	_ = os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "5000")
+	_ = os.Setenv("BPL_JVM_THREAD_COUNT", "300")
 	defer func() {
-		os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
-		os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
-		os.Unsetenv("BPL_JVM_THREAD_COUNT")
+		_ = os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
+		_ = os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+		_ = os.Unsetenv("BPL_JVM_THREAD_COUNT")
 	}()
 
 	mc := Create(true) // quiet mode
@@ -69,25 +70,27 @@ func TestExecuteWithEnvironmentVariables(t *testing.T) {
 
 func TestExecuteWithClassCounting(t *testing.T) {
 	// Clear environment to enable class counting
-	os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+	_ = os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
 
 	// Create temporary directory with mock class file
 	tempDir, err := os.MkdirTemp("", "memory-calculator-test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	//nolint:gosec // Safe in tests
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Create a mock class file
-	classFile, err := os.Create(tempDir + "/Test.class")
+	//nolint:gosec // Safe in tests
+	classFile, err := os.Create(filepath.Join(tempDir, "Test.class"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	classFile.Close()
+	_ = classFile.Close()
 
 	// Set app path to our temp dir
-	os.Setenv("BPI_APPLICATION_PATH", tempDir)
-	defer os.Unsetenv("BPI_APPLICATION_PATH")
+	_ = os.Setenv("BPI_APPLICATION_PATH", tempDir)
+	defer func() { _ = os.Unsetenv("BPI_APPLICATION_PATH") }()
 
 	mc := Create(true) // quiet mode
 	result, err := mc.Execute()
@@ -161,8 +164,8 @@ func TestParseHeadroomConfig(t *testing.T) {
 
 	t.Run("Default Headroom", func(t *testing.T) {
 		// No environment variables set
-		os.Unsetenv("BPL_JVM_HEAD_ROOM")
-		os.Unsetenv("BPL_JVM_HEADROOM")
+		_ = os.Unsetenv("BPL_JVM_HEAD_ROOM")
+		_ = os.Unsetenv("BPL_JVM_HEADROOM")
 
 		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
 		err := mc.parseHeadroomConfig(c)
@@ -176,8 +179,8 @@ func TestParseHeadroomConfig(t *testing.T) {
 	})
 
 	t.Run("Standard Headroom Variable", func(t *testing.T) {
-		os.Setenv("BPL_JVM_HEAD_ROOM", "5")
-		defer os.Unsetenv("BPL_JVM_HEAD_ROOM")
+		_ = os.Setenv("BPL_JVM_HEAD_ROOM", "5")
+		defer func() { _ = os.Unsetenv("BPL_JVM_HEAD_ROOM") }()
 
 		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
 		err := mc.parseHeadroomConfig(c)
@@ -191,8 +194,8 @@ func TestParseHeadroomConfig(t *testing.T) {
 	})
 
 	t.Run("Deprecated Headroom Variable", func(t *testing.T) {
-		os.Setenv("BPL_JVM_HEADROOM", "10")
-		defer os.Unsetenv("BPL_JVM_HEADROOM")
+		_ = os.Setenv("BPL_JVM_HEADROOM", "10")
+		defer func() { _ = os.Unsetenv("BPL_JVM_HEADROOM") }()
 
 		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
 		err := mc.parseHeadroomConfig(c)
@@ -206,11 +209,11 @@ func TestParseHeadroomConfig(t *testing.T) {
 	})
 
 	t.Run("Standard Precedence Over Deprecated", func(t *testing.T) {
-		os.Setenv("BPL_JVM_HEAD_ROOM", "5")
-		os.Setenv("BPL_JVM_HEADROOM", "10")
+		_ = os.Setenv("BPL_JVM_HEAD_ROOM", "5")
+		_ = os.Setenv("BPL_JVM_HEADROOM", "10")
 		defer func() {
-			os.Unsetenv("BPL_JVM_HEAD_ROOM")
-			os.Unsetenv("BPL_JVM_HEADROOM")
+			_ = os.Unsetenv("BPL_JVM_HEAD_ROOM")
+			_ = os.Unsetenv("BPL_JVM_HEADROOM")
 		}()
 
 		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
@@ -225,8 +228,8 @@ func TestParseHeadroomConfig(t *testing.T) {
 	})
 
 	t.Run("Invalid Value", func(t *testing.T) {
-		os.Setenv("BPL_JVM_HEAD_ROOM", "invalid")
-		defer os.Unsetenv("BPL_JVM_HEAD_ROOM")
+		_ = os.Setenv("BPL_JVM_HEAD_ROOM", "invalid")
+		defer func() { _ = os.Unsetenv("BPL_JVM_HEAD_ROOM") }()
 
 		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
 		err := mc.parseHeadroomConfig(c)
@@ -244,23 +247,23 @@ func TestParseClassCountConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Default environment setup
 	setupEnv := func() {
-		os.Setenv("BPI_APPLICATION_PATH", tempDir)
+		_ = os.Setenv("BPI_APPLICATION_PATH", tempDir)
 	}
 	cleanupEnv := func() {
-		os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
-		os.Unsetenv("BPI_APPLICATION_PATH")
-		os.Unsetenv("BPI_JVM_CLASS_COUNT")
-		os.Unsetenv("BPI_CLASS_ADJUSTMENT_FACTOR")
-		os.Unsetenv("BPI_CLASS_STATIC_ADJUSTMENT")
+		_ = os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+		_ = os.Unsetenv("BPI_APPLICATION_PATH")
+		_ = os.Unsetenv("BPI_JVM_CLASS_COUNT")
+		_ = os.Unsetenv("BPI_CLASS_ADJUSTMENT_FACTOR")
+		_ = os.Unsetenv("BPI_CLASS_STATIC_ADJUSTMENT")
 	}
 
 	t.Run("Direct Override", func(t *testing.T) {
 		cleanupEnv()
-		os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "5000")
+		_ = os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "5000")
 		defer cleanupEnv()
 
 		c := &calc.Calculator{}
@@ -279,8 +282,9 @@ func TestParseClassCountConfig(t *testing.T) {
 		defer cleanupEnv()
 
 		// Create a class file
-		classFile, _ := os.Create(tempDir + "/Test.class")
-		classFile.Close()
+		//nolint:gosec // Safe in tests
+		classFile, _ := os.Create(filepath.Join(tempDir, "Test.class"))
+		_ = classFile.Close()
 
 		// Calculation: (JVM(1000) + App(1) + Agent(0) + Static(0)) * Factor(1.0) * LoadFactor(0.35)
 		// = 1001 * 0.35 = 350.35 -> 350
@@ -299,14 +303,15 @@ func TestParseClassCountConfig(t *testing.T) {
 
 	t.Run("Calculation with Adjustments", func(t *testing.T) {
 		setupEnv()
-		os.Setenv("BPI_JVM_CLASS_COUNT", "2000")
-		os.Setenv("BPI_CLASS_ADJUSTMENT_FACTOR", "150") // 1.5x
-		os.Setenv("BPI_CLASS_STATIC_ADJUSTMENT", "100")
+		_ = os.Setenv("BPI_JVM_CLASS_COUNT", "2000")
+		_ = os.Setenv("BPI_CLASS_ADJUSTMENT_FACTOR", "150") // 1.5x
+		_ = os.Setenv("BPI_CLASS_STATIC_ADJUSTMENT", "100")
 		defer cleanupEnv()
 
 		// Create a class file
-		classFile, _ := os.Create(tempDir + "/Test.class")
-		classFile.Close()
+		//nolint:gosec // Safe in tests
+		classFile, _ := os.Create(filepath.Join(tempDir, "Test.class"))
+		_ = classFile.Close()
 
 		// Calculation: (JVM(2000) + App(1) + Agent(0) + Static(100)) * Factor(1.5) * LoadFactor(0.35)
 		// = 2101 * 1.5 * 0.35 = 3151.5 * 0.35 = 1103.025 -> 1103

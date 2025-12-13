@@ -1,3 +1,4 @@
+// Package parser provides utilities for parsing flags and options.
 package parser
 
 import (

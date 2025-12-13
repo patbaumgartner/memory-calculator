@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2025-12-13
+
+### Changed
+- **Go Version**: Upgraded to Go 1.25.5 across all build configurations
+  - Updated `go.mod` to require Go 1.25.5
+  - Updated GitHub Actions workflow to use Go 1.25
+  - Updated Dockerfile base images to `golang:1.25.5-alpine3.21`
+  - Updated example Dockerfiles to use Go 1.25.5
+  - All build artifacts now compiled with Go 1.25.5
+
+### Enhanced
+- **Docker Build System**: Improved multi-platform Docker builds
+  - Updated to Alpine Linux 3.21 for latest security patches and features
+  - Maintained multi-architecture support (linux/amd64, linux/arm64)
+  - Enhanced Docker build reliability with updated base images
+  - Updated example Dockerfiles with consistent Alpine 3.21 base
+
+- **Code Quality**: Refactored test functions to reduce complexity
+  - Simplified `TestMainHostMemoryDetection` using table-driven tests
+  - Refactored `TestBuildConstraints` with extracted helper functions
+  - Improved `TestCalculatorCalculate` with data-driven approach
+  - All test functions now meet cyclomatic complexity threshold (<15)
+  - Enhanced test maintainability and readability
+
+- **Linting Configuration**: Updated golangci-lint setup
+  - Upgraded to golangci-lint v2.7.2
+  - Configured gofumpt settings for consistent code formatting
+  - Enhanced linter rules for better code quality enforcement
+
+### Fixed
+- **Test Complexity**: Resolved golangci-lint complexity violations
+  - Extracted helper functions to reduce cyclomatic complexity
+  - Improved test structure with table-driven patterns
+  - Better separation of concerns in test code
+
+### Technical Details
+- **Go Version**: 1.25.5 (upgraded from 1.24.5)
+- **Alpine Version**: 3.21 (upgraded from 3.20)
+- **golangci-lint**: v2.7.2
+- **Build System**: Enhanced cross-compilation support maintained
+- **Test Coverage**: Maintained high coverage with improved test structure
+
 ## [1.3.1] - 2025-08-04
 
 ### Enhanced
