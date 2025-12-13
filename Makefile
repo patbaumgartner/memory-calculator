@@ -49,6 +49,32 @@ build: ## Build binary for current platform
 	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BINARY_NAME) ./cmd/memory-calculator
 	@echo "Build complete: $(BINARY_NAME)"
 
+build-minimal: ## Build minimal binary for current platform
+	@echo "Building $(BINARY_NAME)-minimal for current platform..."
+	CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -tags minimal -o $(BINARY_NAME)-minimal ./cmd/memory-calculator
+	@echo "Build complete: $(BINARY_NAME)-minimal"
+
+build-compressed: build-minimal ## Build compressed binary (requires UPX)
+	@echo "Compressing binary..."
+	@if command -v upx >/dev/null 2>&1; then \
+		upx --best --lzma $(BINARY_NAME)-minimal -o $(BINARY_NAME)-compressed; \
+		echo "Compressed binary: $(BINARY_NAME)-compressed"; \
+	else \
+		echo "Error: UPX not found. Please install UPX. >> apt-get install upx-ucl"; \
+		exit 1; \
+	fi
+
+build-size-comparison: build build-minimal ## Compare size of standard vs minimal builds
+	@echo ""
+	@echo "Size Comparison:"
+	@echo "Standard: $$(du -h $(BINARY_NAME) | cut -f1)"
+	@echo "Minimal:  $$(du -h $(BINARY_NAME)-minimal | cut -f1)"
+
+build-ultimate-comparison: build-size-comparison ## Compare all build variants (including compressed)
+	@$(MAKE) build-compressed || true
+	@if [ -f "$(BINARY_NAME)-compressed" ]; then \
+		echo "Compressed: $$(du -h $(BINARY_NAME)-compressed | cut -f1)"; \
+	fi
 build-all: ## Build binaries for all platforms
 	@echo "Building $(BINARY_NAME) for all platforms..."
 	@mkdir -p $(DIST_DIR)

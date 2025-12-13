@@ -380,4 +380,36 @@ On git tags (`v*`), additional testing includes:
 - Unsupported platforms: Graceful handling with zero values
 - Platform detection priority: cgroups v2 → cgroups v1 → host system
 
-This comprehensive test suite ensures the JVM Memory Calculator works reliably across different environments and use cases, particularly in containerized environments with buildpack deployment scenarios. The professional package architecture with enhanced host detection provides excellent maintainability and testability while achieving high code coverage.
+## Comprehensive Edge Cases Covered
+
+The test suite includes extensive testing for complex scenarios and edge cases:
+
+### 1. Calculator Package (`internal/calc`)
+- **Memory Boundary Testing**: Very small (64KB) to very large (32GB) memory configurations
+- **JVM Flag Parsing**: Complex multi-flag combinations with validation
+- **Error Handling**: Invalid size formats, parsing failures, memory constraints
+- **Thread Count Edge Cases**: Zero threads, extreme thread counts (10,000+)
+- **Class Count Impact**: Testing metaspace calculation with varying class counts (1K to 1M classes)
+- **Head Room Calculations**: Testing different head room percentages
+- **Memory Allocation Failures**: Scenarios where memory requirements exceed available memory
+
+### 2. Count Package (`internal/count`)
+- **ZIP/JAR File Handling**: Nested JARs, invalid ZIP files, zero-byte files
+- **File System Edge Cases**: Permission denied scenarios, deep directory nesting
+- **Multiple File Extensions**: .class, .classdata, .clj, .groovy, .kts support
+- **Modules File Testing**: Java 9+ module system support with size-based estimation
+- **Error Recovery**: Graceful handling of corrupted files and missing paths
+
+### 3. Errors Package (`pkg/errors`)
+- **Error Chaining**: Multi-level error wrapping and unwrapping
+- **Context Preservation**: Complex context data with nested structures
+- **Error Interface Compliance**: Standard library integration testing
+- **Formatting Edge Cases**: Various error message formatting scenarios
+
+### 4. Constants Package (`internal/constants`)
+- **Constant Value Verification**: All constants have expected values
+- **Type Safety**: All constants use correct Go types
+- **Relationship Validation**: Memory limits have logical relationships
+- **Path Validation**: All system paths are absolute paths
+- **Environment Variable Consistency**: BPL/BPI prefix validation
+The professional package architecture with enhanced host detection provides excellent maintainability and testability while achieving high code coverage.

@@ -540,11 +540,30 @@ Build System
 
 ### Optimization Techniques
 
-1. **Build Constraints**: Conditional compilation
-2. **Link-time Optimization**: `-ldflags="-s -w"`
-3. **Path Trimming**: `-trimpath` for reproducible builds
-4. **Dead Code Elimination**: Go compiler optimization
-5. **Dependency Pruning**: Build tags exclude unused imports
+The project uses **aggressive optimization flags** and **build constraints** to produce smaller binaries:
+
+1.  **Build Constraints**: Conditional compilation with `//go:build` tags
+    -   *Standard Build*: Full functionality (~2.4MB)
+    -   *Minimal Build*: Size optimized (~2.2MB)
+2.  **Strip Debug Information**: `-ldflags="-s -w"`
+    -   `-s`: Strip symbol table
+    -   `-w`: Strip DWARF debug information
+3.  **Path Trimming**: `-trimpath`
+    -   Removes file system paths for reproducible builds
+4.  **Clean Rebuilds**: `-a`
+    -   Forces rebuilding of all packages for optimal linking
+5.  **UPX Compression** (Optional):
+    -   Can further reduce size to ~1.1MB (~68% reduction)
+    -   Trade-off: Slight startup delay due to decompression
+
+#### Feature Comparison
+
+| Feature | Standard | Minimal |
+|---------|----------|---------|
+| **Flag Parsing** | Full Regex Support | String Prefix Matching |
+| **JAR Processing** | ZIP File Analysis | File Size Estimation |
+| **Dependencies** | Standard Library + Regexp/Zip | Reduced Dependencies |
+| **Binary Size** | ~2.4MB | ~2.2MB |
 
 ### Cross-Platform Compilation
 

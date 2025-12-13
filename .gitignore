@@ -18,8 +18,7 @@ vendor/
 go.work
 
 # Build artifacts
-/memory-calculator
-/memory-calculator-minimal
+/memory-calculator*
 dist/
 coverage/
 *.coverage

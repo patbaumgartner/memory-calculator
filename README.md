@@ -446,7 +446,7 @@ make help               # Show all available targets
 
 ## 📖 Documentation
 
-For complete documentation, see **[DOCS_INDEX.md](DOCS_INDEX.md)** - your guide to all project documentation.
+For complete documentation, refer to the files listed above.
 
 ### Quick Links
 - **[USAGE_GUIDE.md](USAGE_GUIDE.md)** - Integration patterns and troubleshooting

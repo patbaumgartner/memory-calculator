@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/patbaumgartner/memory-calculator/internal/calc"
 )
 
 func TestExecuteWithDefaultValues(t *testing.T) {
@@ -152,4 +154,171 @@ func TestCountAgentClasses(t *testing.T) {
 		// This is expected since the jar doesn't exist, but should not panic
 		t.Logf("Expected error for non-existent agent jar: %v", err)
 	}
+}
+
+func TestParseHeadroomConfig(t *testing.T) {
+	mc := Create(true)
+
+	t.Run("Default Headroom", func(t *testing.T) {
+		// No environment variables set
+		os.Unsetenv("BPL_JVM_HEAD_ROOM")
+		os.Unsetenv("BPL_JVM_HEADROOM")
+
+		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
+		err := mc.parseHeadroomConfig(c)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		if c.HeadRoom != DefaultHeadroom {
+			t.Errorf("Expected headroom %d, got %d", DefaultHeadroom, c.HeadRoom)
+		}
+	})
+
+	t.Run("Standard Headroom Variable", func(t *testing.T) {
+		os.Setenv("BPL_JVM_HEAD_ROOM", "5")
+		defer os.Unsetenv("BPL_JVM_HEAD_ROOM")
+
+		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
+		err := mc.parseHeadroomConfig(c)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		if c.HeadRoom != 5 {
+			t.Errorf("Expected headroom 5, got %d", c.HeadRoom)
+		}
+	})
+
+	t.Run("Deprecated Headroom Variable", func(t *testing.T) {
+		os.Setenv("BPL_JVM_HEADROOM", "10")
+		defer os.Unsetenv("BPL_JVM_HEADROOM")
+
+		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
+		err := mc.parseHeadroomConfig(c)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		if c.HeadRoom != 10 {
+			t.Errorf("Expected headroom 10, got %d", c.HeadRoom)
+		}
+	})
+
+	t.Run("Standard Precedence Over Deprecated", func(t *testing.T) {
+		os.Setenv("BPL_JVM_HEAD_ROOM", "5")
+		os.Setenv("BPL_JVM_HEADROOM", "10")
+		defer func() {
+			os.Unsetenv("BPL_JVM_HEAD_ROOM")
+			os.Unsetenv("BPL_JVM_HEADROOM")
+		}()
+
+		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
+		err := mc.parseHeadroomConfig(c)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		if c.HeadRoom != 5 {
+			t.Errorf("Expected headroom 5 (standard), got %d", c.HeadRoom)
+		}
+	})
+	
+	t.Run("Invalid Value", func(t *testing.T) {
+		os.Setenv("BPL_JVM_HEAD_ROOM", "invalid")
+		defer os.Unsetenv("BPL_JVM_HEAD_ROOM")
+		
+		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
+		err := mc.parseHeadroomConfig(c)
+		if err == nil {
+			t.Error("Expected error for invalid headroom value, got nil")
+		}
+	})
+}
+
+func TestParseClassCountConfig(t *testing.T) {
+	mc := Create(true)
+	
+	// Create mock app directory
+	tempDir, err := os.MkdirTemp("", "class-count-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tempDir)
+	
+	// Default environment setup
+	setupEnv := func() {
+		os.Setenv("BPI_APPLICATION_PATH", tempDir)
+	}
+	cleanupEnv := func() {
+		os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
+		os.Unsetenv("BPI_APPLICATION_PATH")
+		os.Unsetenv("BPI_JVM_CLASS_COUNT")
+		os.Unsetenv("BPI_CLASS_ADJUSTMENT_FACTOR")
+		os.Unsetenv("BPI_CLASS_STATIC_ADJUSTMENT")
+	}
+
+	t.Run("Direct Override", func(t *testing.T) {
+		cleanupEnv()
+		os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "5000")
+		defer cleanupEnv()
+		
+		c := &calc.Calculator{}
+		err := mc.parseClassCountConfig(c, "")
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		
+		if c.LoadedClassCount != 5000 {
+			t.Errorf("Expected class count 5000, got %d", c.LoadedClassCount)
+		}
+	})
+
+	t.Run("Calculation with defaults", func(t *testing.T) {
+		setupEnv()
+		defer cleanupEnv()
+		
+		// Create a class file
+		classFile, _ := os.Create(tempDir + "/Test.class")
+		classFile.Close()
+		
+		// Calculation: (JVM(1000) + App(1) + Agent(0) + Static(0)) * Factor(1.0) * LoadFactor(0.35)
+		// = 1001 * 0.35 = 350.35 -> 350
+		
+		c := &calc.Calculator{}
+		err := mc.parseClassCountConfig(c, "")
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		
+		// Check range due to float arithmetic potential minor diffs, though here it should be exact
+		if c.LoadedClassCount != 350 {
+			t.Errorf("Expected class count ~350, got %d", c.LoadedClassCount)
+		}
+	})
+	
+	t.Run("Calculation with Adjustments", func(t *testing.T) {
+		setupEnv()
+		os.Setenv("BPI_JVM_CLASS_COUNT", "2000")
+		os.Setenv("BPI_CLASS_ADJUSTMENT_FACTOR", "150") // 1.5x
+		os.Setenv("BPI_CLASS_STATIC_ADJUSTMENT", "100")
+		defer cleanupEnv()
+		
+		// Create a class file
+		classFile, _ := os.Create(tempDir + "/Test.class")
+		classFile.Close()
+		
+		// Calculation: (JVM(2000) + App(1) + Agent(0) + Static(100)) * Factor(1.5) * LoadFactor(0.35)
+		// = 2101 * 1.5 * 0.35 = 3151.5 * 0.35 = 1103.025 -> 1103
+		
+		c := &calc.Calculator{}
+		err := mc.parseClassCountConfig(c, "")
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		
+		if c.LoadedClassCount != 1103 {
+			t.Errorf("Expected class count ~1103, got %d", c.LoadedClassCount)
+		}
+	})
 }

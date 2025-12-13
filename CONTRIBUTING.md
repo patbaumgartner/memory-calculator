@@ -57,6 +57,56 @@ This project follows a simple code of conduct:
    go test -v ./...
    ```
 
+## Project Structure
+
+```
+memory-calculator/
+├── cmd/                      # Application entry points
+│   └── memory-calculator/
+│       └── main.go           # Main application entry point
+├── internal/                 # Private application packages
+│   ├── calc/                # Core calculation with build variants
+│   ├── calculator/          # Calculator orchestration
+│   ├── cgroups/             # Container memory detection
+│   ├── config/              # Configuration management
+│   ├── count/               # Class counting with build variants
+│   ├── display/             # Output formatting
+│   ├── host/                # Host memory detection
+│   ├── logger/              # Logging utilities
+│   ├── memory/              # Memory parsing logic
+│   └── parser/              # Flag parsing utilities
+├── pkg/                     # Public packages
+│   └── errors/              # Structured error handling
+├── examples/                 # Usage examples and scripts
+├── testdata/                # Test data and fixtures
+├── .github/                 # GitHub Actions and templates
+└── dist/                    # Build artifacts (generated)
+```
+
+## Development Tools
+
+The project includes a comprehensive Makefile to automate common tasks.
+
+### Key Makefile Commands
+
+- **Build**:
+  - `make build` - Build binary for current platform
+  - `make build-all` - Build binaries for all supported platforms
+  - `make build-minimal` - Build size-optimized minimal binary
+  - `make build-compressed` - Build UPX-compressed binary (requires UPX)
+
+- **Test**:
+  - `make test` - Run all tests
+  - `make test-coverage` - Run tests with coverage reporting
+  - `make integration` - Run only integration tests
+  - `make quality` - Run all quality checks (format, lint, security)
+
+- **Development**:
+  - `make deps` - Download dependencies
+  - `make format` - Format Go code
+  - `make lint` - Run linter
+  - `make clean` - Remove build artifacts
+
 ## Development Workflow
 
 ### Branch Naming

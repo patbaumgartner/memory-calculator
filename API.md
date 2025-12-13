@@ -342,7 +342,7 @@ For complete examples and integration patterns, see the [examples directory](exa
 ## 🔗 Related Documentation
 
 - [Architecture Overview](ARCHITECTURE.md) - System design and architecture
-- [Project Setup](PROJECT_SETUP.md) - Development and build information
+- [Project Setup](CONTRIBUTING.md) - Development and build information
 - [Usage Guide](USAGE_GUIDE.md) - Detailed usage examples
 - [Test Documentation](TEST_DOCUMENTATION.md) - Testing framework and coverage
 
