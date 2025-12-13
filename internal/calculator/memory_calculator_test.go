@@ -223,11 +223,11 @@ func TestParseHeadroomConfig(t *testing.T) {
 			t.Errorf("Expected headroom 5 (standard), got %d", c.HeadRoom)
 		}
 	})
-	
+
 	t.Run("Invalid Value", func(t *testing.T) {
 		os.Setenv("BPL_JVM_HEAD_ROOM", "invalid")
 		defer os.Unsetenv("BPL_JVM_HEAD_ROOM")
-		
+
 		c := &calc.Calculator{HeadRoom: DefaultHeadroom}
 		err := mc.parseHeadroomConfig(c)
 		if err == nil {
@@ -238,14 +238,14 @@ func TestParseHeadroomConfig(t *testing.T) {
 
 func TestParseClassCountConfig(t *testing.T) {
 	mc := Create(true)
-	
+
 	// Create mock app directory
 	tempDir, err := os.MkdirTemp("", "class-count-test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(tempDir)
-	
+
 	// Default environment setup
 	setupEnv := func() {
 		os.Setenv("BPI_APPLICATION_PATH", tempDir)
@@ -262,13 +262,13 @@ func TestParseClassCountConfig(t *testing.T) {
 		cleanupEnv()
 		os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "5000")
 		defer cleanupEnv()
-		
+
 		c := &calc.Calculator{}
 		err := mc.parseClassCountConfig(c, "")
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		
+
 		if c.LoadedClassCount != 5000 {
 			t.Errorf("Expected class count 5000, got %d", c.LoadedClassCount)
 		}
@@ -277,46 +277,46 @@ func TestParseClassCountConfig(t *testing.T) {
 	t.Run("Calculation with defaults", func(t *testing.T) {
 		setupEnv()
 		defer cleanupEnv()
-		
+
 		// Create a class file
 		classFile, _ := os.Create(tempDir + "/Test.class")
 		classFile.Close()
-		
+
 		// Calculation: (JVM(1000) + App(1) + Agent(0) + Static(0)) * Factor(1.0) * LoadFactor(0.35)
 		// = 1001 * 0.35 = 350.35 -> 350
-		
+
 		c := &calc.Calculator{}
 		err := mc.parseClassCountConfig(c, "")
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		
+
 		// Check range due to float arithmetic potential minor diffs, though here it should be exact
 		if c.LoadedClassCount != 350 {
 			t.Errorf("Expected class count ~350, got %d", c.LoadedClassCount)
 		}
 	})
-	
+
 	t.Run("Calculation with Adjustments", func(t *testing.T) {
 		setupEnv()
 		os.Setenv("BPI_JVM_CLASS_COUNT", "2000")
 		os.Setenv("BPI_CLASS_ADJUSTMENT_FACTOR", "150") // 1.5x
 		os.Setenv("BPI_CLASS_STATIC_ADJUSTMENT", "100")
 		defer cleanupEnv()
-		
+
 		// Create a class file
 		classFile, _ := os.Create(tempDir + "/Test.class")
 		classFile.Close()
-		
+
 		// Calculation: (JVM(2000) + App(1) + Agent(0) + Static(100)) * Factor(1.5) * LoadFactor(0.35)
 		// = 2101 * 1.5 * 0.35 = 3151.5 * 0.35 = 1103.025 -> 1103
-		
+
 		c := &calc.Calculator{}
 		err := mc.parseClassCountConfig(c, "")
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		
+
 		if c.LoadedClassCount != 1103 {
 			t.Errorf("Expected class count ~1103, got %d", c.LoadedClassCount)
 		}

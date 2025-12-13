@@ -51,7 +51,7 @@ jobs:
     - name: Run linting
       uses: golangci/golangci-lint-action@v9
       with:
-        version: v1.62.2
+        version: v2.7.2
         args: --timeout=5m --config .golangci.yml
         working-directory: .
 
