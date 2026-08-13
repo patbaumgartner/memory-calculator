@@ -5,8 +5,12 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/patbaumgartner/memory-calculator/internal/memory"
 	"github.com/patbaumgartner/memory-calculator/pkg/errors"
 )
+
+// MaxHeadRoom is the largest head room percentage that still leaves memory for the JVM itself.
+const MaxHeadRoom = 99
 
 // Config holds all configuration parameters for the memory calculator.
 type Config struct {
@@ -31,6 +35,7 @@ type Config struct {
 // Load returns a configuration loaded from environment variables.
 func Load() *Config {
 	return &Config{
+		TotalMemory:      os.Getenv("BPL_JVM_TOTAL_MEMORY"),
 		ThreadCount:      getEnvOrDefault("BPL_JVM_THREAD_COUNT", "250"),
 		LoadedClassCount: os.Getenv("BPL_JVM_LOADED_CLASS_COUNT"), // No default - should be calculated
 		HeadRoom:         getEnvOrDefault("BPL_JVM_HEAD_ROOM", "0"),
@@ -42,7 +47,23 @@ func Load() *Config {
 }
 
 // Validate checks if the configuration is valid.
+//
+// Every explicitly supplied value must be usable. Accepting an unparseable memory size here and
+// silently falling back to auto-detection would size the JVM for the host rather than the
+// container, which reliably ends in an OOM kill.
 func (c *Config) Validate() error {
+	// Validate total memory (only if provided)
+	if c.TotalMemory != "" {
+		totalMemory, err := memory.CreateParser().ParseMemoryString(c.TotalMemory)
+		if err != nil {
+			return errors.NewConfigurationError(
+				"total-memory", c.TotalMemory, "must be a memory size such as 2G, 512M, or 1073741824")
+		}
+		if totalMemory <= 0 {
+			return errors.NewConfigurationError("total-memory", c.TotalMemory, "must be greater than zero")
+		}
+	}
+
 	// Validate thread count
 	if threadCount, err := strconv.Atoi(c.ThreadCount); err != nil || threadCount < 1 {
 		return errors.NewConfigurationError("thread-count", c.ThreadCount, "must be a positive integer")
@@ -56,8 +77,9 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate head room
-	if headRoom, err := strconv.Atoi(c.HeadRoom); err != nil || headRoom < 0 || headRoom > 100 {
-		return errors.NewConfigurationError("head-room", c.HeadRoom, "must be an integer between 0 and 100")
+	if headRoom, err := strconv.Atoi(c.HeadRoom); err != nil || headRoom < 0 || headRoom > MaxHeadRoom {
+		return errors.NewConfigurationError(
+			"head-room", c.HeadRoom, "must be an integer between 0 and 99")
 	}
 
 	// Validate path (basic validation - path should not be empty)
