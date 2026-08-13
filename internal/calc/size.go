@@ -4,6 +4,7 @@ package calc
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -115,7 +116,8 @@ type Size struct {
 }
 
 // ParseSize parses a memory size in bytes from the given string. Size may include a K, M, G, or T suffix which
-// indicates kibibytes, mebibytes, gibibytes or tebibytes respectively.
+// indicates kibibytes, mebibytes, gibibytes or tebibytes respectively. Sizes that would overflow int64 once the
+// unit multiplier is applied are rejected rather than wrapping around to a negative value.
 func ParseSize(s string) (Size, error) {
 	t := strings.TrimSpace(s)
 
@@ -126,29 +128,38 @@ func ParseSize(s string) (Size, error) {
 	groups := SizeRE.FindStringSubmatch(t)
 	size, err := strconv.ParseInt(groups[1], 10, 64)
 	if err != nil {
-		return Size{}, fmt.Errorf("memory size %q is not an integer", groups[1])
+		return Size{}, fmt.Errorf("memory size %q does not fit in a 64-bit integer", groups[1])
 	}
 
+	multiplier := int64(1)
 	switch strings.ToLower(groups[2]) {
 	case "k":
-		size *= Kibi
+		multiplier = Kibi
 	case "m":
-		size *= Mebi
+		multiplier = Mebi
 	case "g":
-		size *= Gibi
+		multiplier = Gibi
 	case "t":
-		size *= Tebi
+		multiplier = Tebi
 	}
 
-	return Size{Value: size}, nil
+	// The pattern only matches digits, so size is never negative and this is the only overflow to check.
+	if size > math.MaxInt64/multiplier {
+		return Size{}, fmt.Errorf("memory size %q overflows the maximum supported size of %d bytes", t, int64(math.MaxInt64))
+	}
+
+	return Size{Value: size * multiplier}, nil
 }
 
+// String renders the size as a JVM memory argument using the largest unit that divides it exactly,
+// rounding down so a generated maximum never exceeds its computed budget. Sizes below one kibibyte
+// render as a plain byte count, never as "0".
 func (s Size) String() string {
-	b := s.Value / Kibi
-
-	if b == 0 {
-		return "0"
+	if s.Value < Kibi {
+		return strconv.FormatInt(s.Value, 10)
 	}
+
+	b := s.Value / Kibi
 
 	if b%Gibi == 0 {
 		return fmt.Sprintf("%dT", b/Gibi)

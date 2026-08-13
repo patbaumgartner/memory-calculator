@@ -1,6 +1,7 @@
 package calc
 
 import (
+	"math"
 	"testing"
 )
 
@@ -23,6 +24,12 @@ func TestParseSize(t *testing.T) {
 		{"", 0, true},
 		{"invalid", 0, true},
 		{"-1", 0, true},
+		{"8388608t", 0, true},
+		{"9007199254740992t", 0, true},
+		{"8589934592g", 0, true},
+		{"9223372036854775807", math.MaxInt64, false},
+		{"99999999999999999999", 0, true},
+		{"8191t", 8191 * Tebi, false},
 	}
 
 	for _, test := range tests {
@@ -55,6 +62,9 @@ func TestSizeString(t *testing.T) {
 		{2 * Gibi, "2G"},
 		{512 * Mebi, "512M"},
 		{1536, "1K"}, // 1.5K rounds down to 1K
+		{1, "1"},
+		{511, "511"},
+		{1023, "1023"},
 	}
 
 	for _, test := range tests {
@@ -62,6 +72,33 @@ func TestSizeString(t *testing.T) {
 		result := size.String()
 		if result != test.expected {
 			t.Errorf("For size %d, expected %q, got %q", test.size, test.expected, result)
+		}
+	}
+}
+
+// TestSizeStringNeverExceedsBudget locks the safety contract that generated JVM maximums round down:
+// re-parsing a rendered size must never yield more memory than was allocated.
+func TestSizeStringNeverExceedsBudget(t *testing.T) {
+	sizes := []int64{
+		0, 1, 511, 1023, Kibi, Kibi + 1, 1536, Mebi, Mebi + 512, Gibi, Gibi + 1,
+		Tebi, 2*Gibi + 12345, 240 * Mebi, 10 * Mebi, 1678125 * Kibi, math.MaxInt64,
+	}
+
+	for _, want := range sizes {
+		rendered := Size{Value: want}.String()
+
+		if rendered == "0" && want != 0 {
+			t.Errorf("size %d rendered as %q, which the JVM rejects", want, rendered)
+		}
+
+		got, err := ParseSize(rendered)
+		if err != nil {
+			t.Errorf("size %d rendered as %q, which ParseSize rejects: %v", want, rendered, err)
+			continue
+		}
+
+		if got.Value > want {
+			t.Errorf("size %d rendered as %q which re-parses to %d, exceeding the budget", want, rendered, got.Value)
 		}
 	}
 }
