@@ -1,5 +1,3 @@
-//go:build !minimal
-
 // Package count provides utilities for counting classes in JARs and directories.
 package count
 

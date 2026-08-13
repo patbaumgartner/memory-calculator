@@ -116,14 +116,11 @@ jobs:
           -o "dist/${BINARY_NAME}" \
           ./cmd/memory-calculator
         
-        # Build minimal binary
-        MINIMAL_BINARY_NAME="memory-calculator-minimal-${{ matrix.goos }}-${{ matrix.goarch }}"
-        env CGO_ENABLED=0 go build \
-          -trimpath -a \
-          -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w" \
-          -tags minimal \
-          -o "dist/${MINIMAL_BINARY_NAME}" \
-          ./cmd/memory-calculator
+        # DEPRECATED: the minimal build variant was removed because it used a different,
+        # less accurate class-counting algorithm and shipped untested. The legacy filename is
+        # still published as a copy of the standard binary so existing download URLs keep
+        # working, and will be dropped in the next major release.
+        cp "dist/${BINARY_NAME}" "dist/memory-calculator-minimal-${{ matrix.goos }}-${{ matrix.goarch }}"
         
         # Build static binary (Linux only)
         if [ "${{ matrix.goos }}" = "linux" ]; then
@@ -152,7 +149,7 @@ jobs:
         path: dist/memory-calculator-${{ matrix.goos }}-${{ matrix.goarch }}
         retention-days: 7
 
-    - name: Upload minimal build artifacts
+    - name: Upload deprecated minimal-named artifacts
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: memory-calculator-minimal-${{ matrix.goos }}-${{ matrix.goarch }}

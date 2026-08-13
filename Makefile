@@ -49,32 +49,6 @@ build: ## Build binary for current platform
 	$(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(BINARY_NAME) ./cmd/memory-calculator
 	@echo "Build complete: $(BINARY_NAME)"
 
-build-minimal: ## Build minimal binary for current platform
-	@echo "Building $(BINARY_NAME)-minimal for current platform..."
-	CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -tags minimal -o $(BINARY_NAME)-minimal ./cmd/memory-calculator
-	@echo "Build complete: $(BINARY_NAME)-minimal"
-
-build-compressed: build-minimal ## Build compressed binary (requires UPX)
-	@echo "Compressing binary..."
-	@if command -v upx >/dev/null 2>&1; then \
-		upx --best --lzma $(BINARY_NAME)-minimal -o $(BINARY_NAME)-compressed; \
-		echo "Compressed binary: $(BINARY_NAME)-compressed"; \
-	else \
-		echo "Error: UPX not found. Please install UPX. >> apt-get install upx-ucl"; \
-		exit 1; \
-	fi
-
-build-size-comparison: build build-minimal ## Compare size of standard vs minimal builds
-	@echo ""
-	@echo "Size Comparison:"
-	@echo "Standard: $$(du -h $(BINARY_NAME) | cut -f1)"
-	@echo "Minimal:  $$(du -h $(BINARY_NAME)-minimal | cut -f1)"
-
-build-ultimate-comparison: build-size-comparison ## Compare all build variants (including compressed)
-	@$(MAKE) build-compressed || true
-	@if [ -f "$(BINARY_NAME)-compressed" ]; then \
-		echo "Compressed: $$(du -h $(BINARY_NAME)-compressed | cut -f1)"; \
-	fi
 build-all: ## Build binaries for all platforms
 	@echo "Building $(BINARY_NAME) for all platforms..."
 	@mkdir -p $(DIST_DIR)
@@ -99,27 +73,6 @@ build-all: ## Build binaries for all platforms
 	# macOS arm64 (Apple Silicon)
 	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) -o $(DIST_DIR)/$(BINARY_NAME)-darwin-arm64 ./cmd/memory-calculator
 	
-	@echo "Building minimal variants..."
-	# Minimal Linux amd64
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) \
-		-tags minimal \
-		-o $(DIST_DIR)/$(BINARY_NAME)-minimal-linux-amd64 ./cmd/memory-calculator
-	
-	# Minimal Linux arm64
-	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) \
-		-tags minimal \
-		-o $(DIST_DIR)/$(BINARY_NAME)-minimal-linux-arm64 ./cmd/memory-calculator
-
-	# Minimal macOS amd64
-	GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) \
-		-tags minimal \
-		-o $(DIST_DIR)/$(BINARY_NAME)-minimal-darwin-amd64 ./cmd/memory-calculator
-
-	# Minimal macOS arm64 (Apple Silicon)
-	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 $(GOBUILD) $(BUILD_FLAGS) $(LDFLAGS) \
-		-tags minimal \
-		-o $(DIST_DIR)/$(BINARY_NAME)-minimal-darwin-arm64 ./cmd/memory-calculator
-	
 	@echo ""
 	@echo "✓ Cross-platform build complete!"
 	@echo "Total binaries: $$(ls -1 $(DIST_DIR)/ | wc -l)"
@@ -128,7 +81,6 @@ build-all: ## Build binaries for all platforms
 	@echo "Available builds:"
 	@echo "  Static:  $$(ls -1 $(DIST_DIR)/$(BINARY_NAME)-static-* 2>/dev/null | wc -l) binaries"
 	@echo "  Standard: $$(ls -1 $(DIST_DIR)/$(BINARY_NAME)-linux-* $(DIST_DIR)/$(BINARY_NAME)-darwin-* 2>/dev/null | wc -l) binaries"
-	@echo "  Minimal:  $$(ls -1 $(DIST_DIR)/$(BINARY_NAME)-minimal-* 2>/dev/null | wc -l) binaries"
 
 ## Test commands
 test: ## Run all tests
@@ -225,7 +177,7 @@ vuln-install: ## Install vulnerability checker
 clean: ## Clean build artifacts
 	@echo "Cleaning build artifacts..."
 	$(GOCLEAN)
-	rm -rf $(BINARY_NAME) $(BINARY_NAME)-minimal
+	rm -rf $(BINARY_NAME)
 	rm -rf $(DIST_DIR)
 	rm -rf $(COVERAGE_DIR)
 

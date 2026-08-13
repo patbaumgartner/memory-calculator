@@ -223,15 +223,15 @@ func (c Calculator) parseAndApplyFlags(flags string, m *MemoryRegions) error {
 
 // applyFlagToRegion applies a single flag to the appropriate memory region
 func (c Calculator) applyFlagToRegion(flag string, m *MemoryRegions) error {
-	if matchDirectMemory(flag) {
+	if MatchDirectMemory(flag) {
 		return c.setDirectMemory(flag, m)
-	} else if matchHeap(flag) {
+	} else if MatchHeap(flag) {
 		return c.setHeap(flag, m)
-	} else if matchMetaspace(flag) {
+	} else if MatchMetaspace(flag) {
 		return c.setMetaspace(flag, m)
-	} else if matchReservedCodeCache(flag) {
+	} else if MatchReservedCodeCache(flag) {
 		return c.setReservedCodeCache(flag, m)
-	} else if matchStack(flag) {
+	} else if MatchStack(flag) {
 		return c.setStack(flag, m)
 	}
 	return nil
@@ -239,7 +239,7 @@ func (c Calculator) applyFlagToRegion(flag string, m *MemoryRegions) error {
 
 // setDirectMemory parses and sets direct memory configuration
 func (c Calculator) setDirectMemory(flag string, m *MemoryRegions) error {
-	d, err := parseDirectMemory(flag)
+	d, err := ParseDirectMemory(flag)
 	if err != nil {
 		return fmt.Errorf("unable to parse direct memory\n%w", err)
 	}
@@ -250,29 +250,29 @@ func (c Calculator) setDirectMemory(flag string, m *MemoryRegions) error {
 
 // setHeap parses and sets heap configuration
 func (c Calculator) setHeap(flag string, m *MemoryRegions) error {
-	h, err := parseHeap(flag)
+	h, err := ParseHeap(flag)
 	if err != nil {
 		return fmt.Errorf("unable to parse heap\n%w", err)
 	}
 	h.Provenance = UserConfigured
-	m.Heap = &h
+	m.Heap = h
 	return nil
 }
 
 // setMetaspace parses and sets metaspace configuration
 func (c Calculator) setMetaspace(flag string, m *MemoryRegions) error {
-	ms, err := parseMetaspace(flag)
+	ms, err := ParseMetaspace(flag)
 	if err != nil {
 		return fmt.Errorf("unable to parse metaspace\n%w", err)
 	}
 	ms.Provenance = UserConfigured
-	m.Metaspace = &ms
+	m.Metaspace = ms
 	return nil
 }
 
 // setReservedCodeCache parses and sets reserved code cache configuration
 func (c Calculator) setReservedCodeCache(flag string, m *MemoryRegions) error {
-	r, err := parseReservedCodeCache(flag)
+	r, err := ParseReservedCodeCache(flag)
 	if err != nil {
 		return fmt.Errorf("unable to parse reserved code cache\n%w", err)
 	}
@@ -283,7 +283,7 @@ func (c Calculator) setReservedCodeCache(flag string, m *MemoryRegions) error {
 
 // setStack parses and sets stack configuration
 func (c Calculator) setStack(flag string, m *MemoryRegions) error {
-	st, err := parseStack(flag)
+	st, err := ParseStack(flag)
 	if err != nil {
 		return fmt.Errorf("unable to parse stack\n%w", err)
 	}
