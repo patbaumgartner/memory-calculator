@@ -70,6 +70,31 @@ func TestParseFlags(t *testing.T) {
 			input:    `-Dvalue1='single quotes' -Dvalue2="double quotes"`,
 			expected: []string{"-Dvalue1=single quotes", "-Dvalue2=double quotes"},
 		},
+		{
+			name:     "Quoted section in the middle of a word",
+			input:    `-D"foo"=bar`,
+			expected: []string{"-Dfoo=bar"},
+		},
+		{
+			name:     "Quoted section joins surrounding text",
+			input:    `a"b"c`,
+			expected: []string{"abc"},
+		},
+		{
+			name:     "Single quotes are literal",
+			input:    `-Dvalue='a\b' -Dother='say "hi"'`,
+			expected: []string{`-Dvalue=a\b`, `-Dother=say "hi"`},
+		},
+		{
+			name:     "Escaped space keeps one argument",
+			input:    `-Dpath=/opt/my\ app/lib`,
+			expected: []string{"-Dpath=/opt/my app/lib"},
+		},
+		{
+			name:     "Tabs and newlines separate arguments",
+			input:    "-Xmx1G\t-Xss2m\n-Xms256m",
+			expected: []string{"-Xmx1G", "-Xss2m", "-Xms256m"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -98,11 +123,6 @@ func TestParseFlagsEdgeCases(t *testing.T) {
 			expected: nil,
 		},
 		{
-			name:     "Unclosed quotes - should still work",
-			input:    `-Dvalue="unclosed quote`,
-			expected: []string{`-Dvalue=unclosed quote`},
-		},
-		{
 			name:     "Empty quoted string",
 			input:    `-Dvalue=""`,
 			expected: []string{"-Dvalue="},
@@ -123,6 +143,32 @@ func TestParseFlagsEdgeCases(t *testing.T) {
 			}
 			if !reflect.DeepEqual(result, tt.expected) {
 				t.Errorf("ParseFlags() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestParseFlagsRejectsMalformedInput covers input the splitter cannot interpret unambiguously.
+// Guessing here would hand the calculator flags the user never wrote, so it must fail instead.
+func TestParseFlagsRejectsMalformedInput(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"Unterminated double quote", `-Dvalue="unclosed quote`},
+		{"Unterminated single quote", `-Dvalue='unclosed quote`},
+		{"Unterminated quote after valid flags", `-Xmx1G "oops`},
+		{"Dangling escape", `-Xmx1G\`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := ParseFlags(tt.input)
+			if err == nil {
+				t.Errorf("ParseFlags(%q) = %v, want an error", tt.input, result)
+			}
+			if result != nil {
+				t.Errorf("ParseFlags(%q) returned %v alongside an error, want nil", tt.input, result)
 			}
 		})
 	}

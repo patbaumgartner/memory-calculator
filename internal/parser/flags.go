@@ -2,64 +2,82 @@
 package parser
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 )
 
-// ParseFlags parses JVM flags from a string, handling basic quoting and escaping
-// This replaces the go-shellwords dependency with a simpler, more focused implementation
+type quoteState uint8
+
+const (
+	unquoted quoteState = iota
+	singleQuoted
+	doubleQuoted
+)
+
+// ParseFlags splits a JVM options string into individual arguments using POSIX-like shell word
+// rules: unquoted whitespace separates arguments, single quotes are literal, double quotes and
+// unquoted text honour backslash escapes, and a quoted section joins the word around it rather
+// than becoming a word of its own.
+//
+// Unterminated quotes and dangling escapes are rejected, because silently mis-splitting a JVM
+// option string would produce memory flags the caller never asked for.
 func ParseFlags(input string) ([]string, error) {
-	if input == "" {
-		return nil, nil
-	}
+	var (
+		result  []string
+		current strings.Builder
+		state   quoteState
+		escaped bool
+		started bool
+	)
 
-	var result []string
-	var current strings.Builder
-	var inQuotes bool
-	var quoteChar rune
-	var escaped bool
-
-	for i, r := range input {
+	for _, r := range input {
 		switch {
 		case escaped:
-			// Previous character was escape, add this character literally
 			current.WriteRune(r)
 			escaped = false
 
-		case r == '\\':
-			// Escape character
+		case r == '\\' && state != singleQuoted:
 			escaped = true
+			started = true
 
-		case !inQuotes && (r == '"' || r == '\''):
-			// Start of quoted section
-			inQuotes = true
-			quoteChar = r
+		case r == '\'' && state == unquoted:
+			state = singleQuoted
+			started = true
 
-		case inQuotes && r == quoteChar:
-			// End of quoted section - add even if empty
-			result = append(result, current.String())
-			current.Reset()
-			inQuotes = false
-			quoteChar = 0
+		case r == '"' && state == unquoted:
+			state = doubleQuoted
+			started = true
 
-		case !inQuotes && unicode.IsSpace(r):
-			// Space outside quotes - end current argument
-			if current.Len() > 0 {
+		case r == '\'' && state == singleQuoted:
+			state = unquoted
+
+		case r == '"' && state == doubleQuoted:
+			state = unquoted
+
+		case state == unquoted && unicode.IsSpace(r):
+			if started {
 				result = append(result, current.String())
 				current.Reset()
+				started = false
 			}
 
 		default:
-			// Regular character
 			current.WriteRune(r)
+			started = true
 		}
+	}
 
-		// Handle end of string
-		if i == len(input)-1 {
-			if current.Len() > 0 {
-				result = append(result, current.String())
-			}
-		}
+	if escaped {
+		return nil, fmt.Errorf("unterminated escape sequence in %q", input)
+	}
+
+	if state != unquoted {
+		return nil, fmt.Errorf("unterminated quote in %q", input)
+	}
+
+	if started {
+		result = append(result, current.String())
 	}
 
 	return result, nil
