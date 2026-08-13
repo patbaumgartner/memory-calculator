@@ -105,7 +105,7 @@ func TestCalculatorCalculate(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Flags with unclosed quotes (handled gracefully)",
+			name: "Flags with unclosed quotes are rejected",
 			calculator: Calculator{
 				HeadRoom:         10,
 				LoadedClassCount: 5000,
@@ -113,7 +113,8 @@ func TestCalculatorCalculate(t *testing.T) {
 				TotalMemory:      Size{Value: 2 * Gibi},
 			},
 			flags:       `"unclosed quote`,
-			expectError: false,
+			expectError: true,
+			errorMsg:    "unable to parse flags",
 		},
 		{
 			name: "Invalid direct memory format",
