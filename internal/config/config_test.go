@@ -156,6 +156,69 @@ func TestConfigValidation(t *testing.T) {
 			},
 			expectError: true,
 		},
+		{
+			name: "Valid total memory with unit",
+			config: &Config{
+				TotalMemory: "2G", ThreadCount: "250", HeadRoom: "0", Path: "/app",
+			},
+			expectError: false,
+		},
+		{
+			name: "Valid total memory as decimal",
+			config: &Config{
+				TotalMemory: "1.5GB", ThreadCount: "250", HeadRoom: "0", Path: "/app",
+			},
+			expectError: false,
+		},
+		{
+			name: "Valid total memory as plain bytes",
+			config: &Config{
+				TotalMemory: "1073741824", ThreadCount: "250", HeadRoom: "0", Path: "/app",
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid total memory - not a size",
+			config: &Config{
+				TotalMemory: "banana", ThreadCount: "250", HeadRoom: "0", Path: "/app",
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid total memory - unknown unit",
+			config: &Config{
+				TotalMemory: "2X", ThreadCount: "250", HeadRoom: "0", Path: "/app",
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid total memory - negative",
+			config: &Config{
+				TotalMemory: "-2G", ThreadCount: "250", HeadRoom: "0", Path: "/app",
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid total memory - zero",
+			config: &Config{
+				TotalMemory: "0", ThreadCount: "250", HeadRoom: "0", Path: "/app",
+			},
+			expectError: true,
+		},
+		{
+			name: "Valid head room at the 99 percent bound",
+			config: &Config{
+				ThreadCount: "250", HeadRoom: "99", Path: "/app",
+			},
+			expectError: false,
+		},
+		{
+			name: "Invalid head room - 100 percent leaves nothing for the JVM",
+			config: &Config{
+				ThreadCount: "250", HeadRoom: "100", Path: "/app",
+			},
+			expectError: true,
+		},
 	}
 
 	for _, tc := range testCases {

@@ -40,7 +40,7 @@ package main
 
 import (
 	"flag"
-	"log"
+	"fmt"
 	"os"
 
 	"github.com/patbaumgartner/memory-calculator/internal/calculator"
@@ -63,7 +63,8 @@ func main() {
 	cfg.CommitHash = commitHash
 
 	// Parse command line flags
-	flag.StringVar(&cfg.TotalMemory, "total-memory", "", "Total memory (e.g., 2G, 512M, 1024MB, 2147483648)")
+	flag.StringVar(&cfg.TotalMemory, "total-memory", cfg.TotalMemory,
+		"Total memory (e.g., 2G, 512M, 1024MB, 2147483648)")
 	flag.StringVar(&cfg.ThreadCount, "thread-count", cfg.ThreadCount, "JVM thread count")
 	flag.StringVar(&cfg.LoadedClassCount, "loaded-class-count", cfg.LoadedClassCount, "JVM loaded class count")
 	flag.StringVar(&cfg.HeadRoom, "head-room", cfg.HeadRoom, "JVM head room percentage")
@@ -88,10 +89,7 @@ func main() {
 
 	// Validate configuration
 	if err := cfg.Validate(); err != nil {
-		if !cfg.Quiet {
-			log.Printf("Configuration error: %v", err)
-		}
-		os.Exit(1)
+		fail(err)
 	}
 
 	// Set environment variables for memory calculator
@@ -109,7 +107,7 @@ func main() {
 	mc := calculator.Create(cfg.Quiet)
 	props, err := mc.Execute()
 	if err != nil {
-		handleError(cfg.Quiet, "Memory calculation failed", err)
+		fail(errors.NewCalculationError("memory calculation failed", err))
 	}
 
 	// Display results
@@ -123,12 +121,13 @@ func setDefaultEnvironmentVariables() {
 	}
 }
 
-// handleError handles and logs errors consistently
-func handleError(quiet bool, message string, err error) {
-	mcErr := errors.NewCalculationError(message, err)
-	if !quiet {
-		log.Printf("Error: %v", mcErr)
-	}
+// fail reports an error and exits non-zero.
+//
+// Diagnostics always go to stderr, including under --quiet: that flag keeps stdout clean for
+// `$(memory-calculator --quiet)` capture, and silently exiting non-zero would leave a caller with
+// empty JVM options and no explanation.
+func fail(err error) {
+	fmt.Fprintf(os.Stderr, "memory-calculator: %v\n", err)
 	os.Exit(1)
 }
 

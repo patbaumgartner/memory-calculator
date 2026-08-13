@@ -70,10 +70,19 @@ func TestMainIntegration(t *testing.T) {
 			},
 		},
 		{
-			name: "Invalid memory format",
-			args: []string{"--total-memory", "invalid"},
+			name:        "Invalid memory format",
+			args:        []string{"--total-memory", "invalid"},
+			expectError: true,
 			expectedOutput: []string{
-				"JVM Memory Configuration", // Should still show output with detected memory
+				"total-memory",
+			},
+		},
+		{
+			name:        "Invalid memory unit",
+			args:        []string{"--total-memory", "2X", "--quiet"},
+			expectError: true,
+			expectedOutput: []string{
+				"total-memory",
 			},
 		},
 		{
@@ -150,11 +159,9 @@ func TestMainIntegration(t *testing.T) {
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but command succeeded. Output: %s", outputStr)
+					return
 				}
-				return
-			}
-
-			if err != nil {
+			} else if err != nil {
 				t.Errorf("Command failed with error: %v. Output: %s", err, outputStr)
 				return
 			}
