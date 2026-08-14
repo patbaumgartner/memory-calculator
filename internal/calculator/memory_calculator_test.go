@@ -2,6 +2,7 @@ package calculator
 
 import (
 	"archive/zip"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -144,5 +145,39 @@ func TestExecuteRejectsInvalidDomainInput(t *testing.T) {
 
 	if _, err := Create(true).Execute(input); err == nil {
 		t.Error("Execute() succeeded, want an error")
+	}
+}
+
+func TestAdjustedClassCount(t *testing.T) {
+	tests := []struct {
+		name                    string
+		jvm, app, agent, static int
+		factor                  int
+		want                    int
+		wantError               bool
+	}{
+		{"normal", 1000, 1, 0, 100, 200, 770, false},
+		{"zero factor", 1000, 1, 0, 0, 0, 0, false},
+		{"negative adjusted total", 0, 0, 0, -1, 100, 0, true},
+		{"sum overflow", math.MaxInt, math.MaxInt, 0, 0, 100, 0, true},
+		{"scale overflow", math.MaxInt, 0, 0, 0, math.MaxInt, 0, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := adjustedClassCount(tt.jvm, tt.app, tt.agent, tt.static, tt.factor)
+			if tt.wantError {
+				if err == nil {
+					t.Fatalf("adjustedClassCount() = %d, want an error", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("adjustedClassCount() error = %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("adjustedClassCount() = %d, want %d", got, tt.want)
+			}
+		})
 	}
 }

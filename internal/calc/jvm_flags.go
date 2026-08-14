@@ -111,6 +111,9 @@ func parseFlag(s, prefix string) (Size, error) {
 	if err != nil {
 		return Size{}, fmt.Errorf("invalid value in JVM option %q\n%w", t, err)
 	}
+	if z.Value <= 0 {
+		return Size{}, fmt.Errorf("JVM option %q must be greater than zero", t)
+	}
 
 	return z, nil
 }

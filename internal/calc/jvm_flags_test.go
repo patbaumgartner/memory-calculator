@@ -1,6 +1,7 @@
 package calc
 
 import (
+	"math"
 	"testing"
 )
 
@@ -155,6 +156,81 @@ func TestCalculateRejectsInputsThatInflateHeap(t *testing.T) {
 			result, err := c.Calculate("")
 			if err == nil {
 				t.Fatalf("Calculate() succeeded with heap %v, want an error", result.Heap)
+			}
+		})
+	}
+}
+
+func TestCalculateRejectsArithmeticOverflow(t *testing.T) {
+	tests := []struct {
+		name       string
+		calculator Calculator
+		flags      string
+	}{
+		{
+			name: "thread stack multiplication",
+			calculator: Calculator{
+				TotalMemory:      Size{Value: Gibi},
+				ThreadCount:      math.MaxInt,
+				LoadedClassCount: 1000,
+			},
+		},
+		{
+			name: "metaspace multiplication",
+			calculator: Calculator{
+				TotalMemory:      Size{Value: Gibi},
+				ThreadCount:      1,
+				LoadedClassCount: math.MaxInt,
+			},
+		},
+		{
+			name: "user heap addition",
+			calculator: Calculator{
+				TotalMemory:      Size{Value: Gibi},
+				ThreadCount:      1,
+				LoadedClassCount: 1000,
+			},
+			flags: "-Xmx9223372036854775807",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if result, err := tt.calculator.Calculate(tt.flags); err == nil {
+				t.Fatalf("Calculate() succeeded with %+v, want an overflow error", result)
+			}
+		})
+	}
+}
+
+func TestCalculateRejectsZeroHeapBoundary(t *testing.T) {
+	calculator := Calculator{
+		TotalMemory:      Size{Value: 277_198_376},
+		ThreadCount:      1,
+		LoadedClassCount: 1000,
+	}
+
+	if result, err := calculator.Calculate(""); err == nil {
+		t.Fatalf("Calculate() succeeded with heap %v, want an error", result.Heap)
+	}
+}
+
+func TestCalculateRejectsZeroValuedJVMRegions(t *testing.T) {
+	for _, flag := range []string{
+		"-Xmx0",
+		"-Xss0",
+		"-XX:MaxMetaspaceSize=0",
+		"-XX:MaxDirectMemorySize=0",
+		"-XX:ReservedCodeCacheSize=0",
+	} {
+		t.Run(flag, func(t *testing.T) {
+			calculator := Calculator{
+				TotalMemory:      Size{Value: 2 * Gibi},
+				ThreadCount:      1,
+				LoadedClassCount: 1000,
+			}
+			if _, err := calculator.Calculate(flag); err == nil {
+				t.Errorf("Calculate(%q) succeeded, want an error", flag)
 			}
 		})
 	}
