@@ -33,17 +33,35 @@ jobs:
     - name: Download dependencies
       run: go mod download
 
-    - name: Verify Go build
+    - name: Verify build and cross-compilation
       run: |
-        echo "Testing build process..."
+        set -euo pipefail
         go build -trimpath -ldflags "-s -w" -o test-binary ./cmd/memory-calculator
         ./test-binary --version
         rm test-binary
+        for target in linux/arm64 darwin/amd64 darwin/arm64; do
+          echo "Cross-compiling for $target"
+          CGO_ENABLED=0 GOOS=${target%/*} GOARCH=${target#*/} \
+            go build -trimpath -o /dev/null ./cmd/memory-calculator
+        done
+
+    - name: Check formatting
+      run: |
+        unformatted=$(gofmt -l .)
+        if [ -n "$unformatted" ]; then
+          echo "These files are not gofmt-formatted:"
+          echo "$unformatted"
+          gofmt -d .
+          exit 1
+        fi
 
     - name: Run tests
       run: go test -v -race -timeout=10m -coverprofile=coverage.out ./...
       env:
         CGO_ENABLED: 1
+
+    - name: Run behaviour smoke test
+      run: ./test-local.sh
 
     - name: Generate coverage report
       run: go tool cover -func=coverage.out
@@ -291,20 +309,31 @@ jobs:
 
     - name: Test Docker image
       run: |
-        echo "Testing Docker image functionality..."
-        
-        # Test version command
-        echo "Testing --version command:"
-        docker run --rm ${{ secrets.DOCKER_USERNAME }}/memory-calculator:latest --version || {
-          echo "Version test failed"
+        set -euo pipefail
+        IMAGE=${{ secrets.DOCKER_USERNAME }}/memory-calculator:latest
+
+        echo "Testing --version:"
+        docker run --rm "$IMAGE" --version
+
+        echo "Testing explicit memory:"
+        docker run --rm --memory=1g "$IMAGE" --total-memory=1G --loaded-class-count=5000 --quiet
+
+        # The point of the tool: with no --total-memory it must read the cgroup limit.
+        # A heap sized for the host rather than the 512m limit would be far larger.
+        echo "Testing cgroup limit detection:"
+        HEAP=$(docker run --rm --memory=512m "$IMAGE" --loaded-class-count=5000 --path=/tmp --quiet \
+          | tr ' ' '\n' | grep '^-Xmx')
+        echo "detected heap: $HEAP"
+        BYTES=$(echo "$HEAP" | sed 's/-Xmx//; s/K$//')
+        if [ "$BYTES" -gt 400000 ] || [ "$BYTES" -lt 50000 ]; then
+          echo "Heap $HEAP is not consistent with a 512m container limit"
           exit 1
-        }
-        
-        # Test memory calculation
-        echo "Testing memory calculation:"
-        docker run --rm --memory=1g ${{ secrets.DOCKER_USERNAME }}/memory-calculator:latest --total-memory=1G --loaded-class-count=5000 --quiet || {
-          echo "Memory calculation test failed"
+        fi
+
+        echo "Testing that invalid input fails loudly:"
+        if docker run --rm "$IMAGE" --total-memory=banana --quiet 2>/dev/null; then
+          echo "Expected a non-zero exit for invalid input"
           exit 1
-        }
-        
+        fi
+
         echo "Docker image tests completed successfully"
