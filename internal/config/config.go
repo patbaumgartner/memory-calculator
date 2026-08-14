@@ -31,6 +31,7 @@ type Config struct {
 	AdjustmentFactor string
 	StaticAdjustment string
 	JavaToolOptions  string
+	Warnings         []string
 
 	Quiet   bool
 	Version bool
@@ -44,9 +45,19 @@ type Config struct {
 // Load reads every supported environment variable once, applying defaults and compatibility
 // precedence at the process boundary.
 func Load() *Config {
-	headRoom := os.Getenv("BPL_JVM_HEAD_ROOM")
-	if headRoom == "" {
-		headRoom = os.Getenv("BPL_JVM_HEADROOM")
+	newHeadRoom := os.Getenv("BPL_JVM_HEAD_ROOM")
+	deprecatedHeadRoom := os.Getenv("BPL_JVM_HEADROOM")
+	headRoom := newHeadRoom
+	warnings := make([]string, 0, 1)
+	if deprecatedHeadRoom != "" {
+		if newHeadRoom != "" {
+			warnings = append(warnings,
+				"BPL_JVM_HEADROOM is deprecated and ignored because BPL_JVM_HEAD_ROOM is set")
+		} else {
+			headRoom = deprecatedHeadRoom
+			warnings = append(warnings,
+				"BPL_JVM_HEADROOM is deprecated; use BPL_JVM_HEAD_ROOM instead")
+		}
 	}
 	if headRoom == "" {
 		headRoom = defaultHeadRoom
@@ -62,6 +73,7 @@ func Load() *Config {
 		AdjustmentFactor: getEnvOrDefault("BPI_CLASS_ADJUSTMENT_FACTOR", defaultAdjustment),
 		StaticAdjustment: getEnvOrDefault("BPI_CLASS_STATIC_ADJUSTMENT", defaultStaticAdjustment),
 		JavaToolOptions:  os.Getenv("JAVA_TOOL_OPTIONS"),
+		Warnings:         warnings,
 		BuildVersion:     "dev",
 		BuildTime:        "unknown",
 		CommitHash:       "unknown",

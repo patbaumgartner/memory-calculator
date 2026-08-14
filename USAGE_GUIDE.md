@@ -426,16 +426,10 @@ The `--path` parameter enables intelligent class count estimation by scanning JA
 - Eliminates need to manually specify class counts
 - Clear display of calculation source
 
-### Improved Display Output
+### Display Output
 
-The calculator now provides clearer information about calculated values:
+The report always shows the resolved class count used to size metaspace, whether it was supplied or calculated:
 
-**When class count is auto-calculated:**
-```
-Loaded Classes:   auto-calculated from /opt/myapp
-```
-
-**When class count is manually specified:**
 ```
 Loaded Classes:   50000
 ```
