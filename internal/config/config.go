@@ -1,4 +1,4 @@
-// Package config handles configuration management for the memory calculator.
+// Package config loads and validates the memory calculator's external configuration.
 package config
 
 import (
@@ -6,51 +6,70 @@ import (
 	"strconv"
 
 	"github.com/patbaumgartner/memory-calculator/internal/calc"
+	"github.com/patbaumgartner/memory-calculator/internal/calculator"
 	"github.com/patbaumgartner/memory-calculator/internal/memory"
 	"github.com/patbaumgartner/memory-calculator/pkg/errors"
 )
 
-// Config holds all configuration parameters for the memory calculator.
+const (
+	defaultThreadCount      = "250"
+	defaultHeadRoom         = "0"
+	defaultApplicationPath  = "/app"
+	defaultJVMClassCount    = "1000"
+	defaultAdjustment       = "100"
+	defaultStaticAdjustment = "0"
+)
+
+// Config holds the CLI and environment representation of the calculator configuration.
 type Config struct {
-	// Memory configuration
 	TotalMemory      string
 	ThreadCount      string
 	LoadedClassCount string
 	HeadRoom         string
 	Path             string
+	JVMClassCount    string
+	AdjustmentFactor string
+	StaticAdjustment string
+	JavaToolOptions  string
 
-	// Output configuration
 	Quiet   bool
 	Version bool
 	Help    bool
 
-	// Build information
 	BuildVersion string
 	BuildTime    string
 	CommitHash   string
 }
 
-// Load returns a configuration loaded from environment variables.
+// Load reads every supported environment variable once, applying defaults and compatibility
+// precedence at the process boundary.
 func Load() *Config {
+	headRoom := os.Getenv("BPL_JVM_HEAD_ROOM")
+	if headRoom == "" {
+		headRoom = os.Getenv("BPL_JVM_HEADROOM")
+	}
+	if headRoom == "" {
+		headRoom = defaultHeadRoom
+	}
+
 	return &Config{
 		TotalMemory:      os.Getenv("BPL_JVM_TOTAL_MEMORY"),
-		ThreadCount:      getEnvOrDefault("BPL_JVM_THREAD_COUNT", "250"),
-		LoadedClassCount: os.Getenv("BPL_JVM_LOADED_CLASS_COUNT"), // No default - should be calculated
-		HeadRoom:         getEnvOrDefault("BPL_JVM_HEAD_ROOM", "0"),
-		Path:             getEnvOrDefault("BPI_APPLICATION_PATH", "/app"),
+		ThreadCount:      getEnvOrDefault("BPL_JVM_THREAD_COUNT", defaultThreadCount),
+		LoadedClassCount: os.Getenv("BPL_JVM_LOADED_CLASS_COUNT"),
+		HeadRoom:         headRoom,
+		Path:             getEnvOrDefault("BPI_APPLICATION_PATH", defaultApplicationPath),
+		JVMClassCount:    getEnvOrDefault("BPI_JVM_CLASS_COUNT", defaultJVMClassCount),
+		AdjustmentFactor: getEnvOrDefault("BPI_CLASS_ADJUSTMENT_FACTOR", defaultAdjustment),
+		StaticAdjustment: getEnvOrDefault("BPI_CLASS_STATIC_ADJUSTMENT", defaultStaticAdjustment),
+		JavaToolOptions:  os.Getenv("JAVA_TOOL_OPTIONS"),
 		BuildVersion:     "dev",
 		BuildTime:        "unknown",
 		CommitHash:       "unknown",
 	}
 }
 
-// Validate checks if the configuration is valid.
-//
-// Every explicitly supplied value must be usable. Accepting an unparseable memory size here and
-// silently falling back to auto-detection would size the JVM for the host rather than the
-// container, which reliably ends in an OOM kill.
+// Validate checks every external value before it reaches the calculation domain.
 func (c *Config) Validate() error {
-	// Validate total memory (only if provided)
 	if c.TotalMemory != "" {
 		totalMemory, err := memory.CreateParser().ParseMemoryString(c.TotalMemory)
 		if err != nil {
@@ -62,54 +81,101 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	// Validate thread count
-	if threadCount, err := strconv.Atoi(c.ThreadCount); err != nil || threadCount < 1 {
-		return errors.NewConfigurationError("thread-count", c.ThreadCount, "must be a positive integer")
+	if _, err := positiveInteger("thread-count", c.ThreadCount); err != nil {
+		return err
 	}
 
-	// Validate loaded class count (only if provided)
 	if c.LoadedClassCount != "" {
-		if classCount, err := strconv.Atoi(c.LoadedClassCount); err != nil || classCount < 1 {
-			return errors.NewConfigurationError("loaded-class-count", c.LoadedClassCount, "must be a positive integer")
+		if _, err := positiveInteger("loaded-class-count", c.LoadedClassCount); err != nil {
+			return err
 		}
 	}
 
-	// Validate head room
-	if headRoom, err := strconv.Atoi(c.HeadRoom); err != nil || headRoom < 0 || headRoom > calc.MaxHeadRoom {
-		return errors.NewConfigurationError(
-			"head-room", c.HeadRoom, "must be an integer between 0 and 99")
+	headRoom, err := strconv.Atoi(c.HeadRoom)
+	if err != nil || headRoom < 0 || headRoom > calc.MaxHeadRoom {
+		return errors.NewConfigurationError("head-room", c.HeadRoom, "must be an integer between 0 and 99")
 	}
 
-	// Validate path (basic validation - path should not be empty)
 	if c.Path == "" {
 		return errors.NewConfigurationError("path", c.Path, "application path cannot be empty")
+	}
+
+	if _, err := nonNegativeInteger("BPI_JVM_CLASS_COUNT", valueOrDefault(c.JVMClassCount, defaultJVMClassCount)); err != nil {
+		return err
+	}
+	if _, err := nonNegativeInteger("BPI_CLASS_ADJUSTMENT_FACTOR",
+		valueOrDefault(c.AdjustmentFactor, defaultAdjustment)); err != nil {
+		return err
+	}
+	if _, err := integer("BPI_CLASS_STATIC_ADJUSTMENT",
+		valueOrDefault(c.StaticAdjustment, defaultStaticAdjustment)); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// SetEnvironmentVariables sets buildpack environment variables from the config.
-func (c *Config) SetEnvironmentVariables() {
-	_ = os.Setenv("BPL_JVM_THREAD_COUNT", c.ThreadCount)
+// Input converts validated external configuration into the typed calculator contract.
+func (c *Config) Input() calculator.Input {
+	threadCount, _ := strconv.Atoi(c.ThreadCount)
+	headRoom, _ := strconv.Atoi(c.HeadRoom)
+	jvmClassCount, _ := strconv.Atoi(valueOrDefault(c.JVMClassCount, defaultJVMClassCount))
+	adjustmentFactor, _ := strconv.Atoi(valueOrDefault(c.AdjustmentFactor, defaultAdjustment))
+	staticAdjustment, _ := strconv.Atoi(valueOrDefault(c.StaticAdjustment, defaultStaticAdjustment))
+
+	input := calculator.Input{
+		ThreadCount:      threadCount,
+		HeadRoom:         headRoom,
+		ApplicationPath:  c.Path,
+		JavaToolOptions:  c.JavaToolOptions,
+		JVMClassCount:    jvmClassCount,
+		AdjustmentFactor: adjustmentFactor,
+		StaticAdjustment: staticAdjustment,
+	}
+
+	if c.TotalMemory != "" {
+		value, _ := memory.CreateParser().ParseMemoryString(c.TotalMemory)
+		input.TotalMemory = &value
+	}
+
 	if c.LoadedClassCount != "" {
-		_ = os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", c.LoadedClassCount)
+		value, _ := strconv.Atoi(c.LoadedClassCount)
+		input.LoadedClassCount = &value
 	}
-	_ = os.Setenv("BPL_JVM_HEAD_ROOM", c.HeadRoom)
-	if c.Path != "" {
-		_ = os.Setenv("BPI_APPLICATION_PATH", c.Path)
-	}
+
+	return input
 }
 
-// SetTotalMemory sets the total memory environment variable if memory is specified.
-func (c *Config) SetTotalMemory(totalMemory int64) {
-	if totalMemory > 0 {
-		_ = os.Setenv("BPL_JVM_TOTAL_MEMORY", strconv.FormatInt(totalMemory, 10))
+func positiveInteger(name, value string) (int, error) {
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 1 {
+		return 0, errors.NewConfigurationError(name, value, "must be a positive integer")
 	}
+	return parsed, nil
 }
 
-// getEnvOrDefault returns the environment variable value or a default value.
+func nonNegativeInteger(name, value string) (int, error) {
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 {
+		return 0, errors.NewConfigurationError(name, value, "must be a non-negative integer")
+	}
+	return parsed, nil
+}
+
+func integer(name, value string) (int, error) {
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, errors.NewConfigurationError(name, value, "must be an integer")
+	}
+	return parsed, nil
+}
+
 func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
+	return valueOrDefault(os.Getenv(key), defaultValue)
+}
+
+func valueOrDefault(value, defaultValue string) string {
+	if value != "" {
 		return value
 	}
 	return defaultValue
