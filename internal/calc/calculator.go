@@ -201,7 +201,9 @@ func (c Calculator) Calculate(flags string) (MemoryRegions, error) {
 	}
 
 	// Calculate metaspace if not configured
-	c.calculateMetaspaceIfNeeded(&m)
+	if err := c.calculateMetaspaceIfNeeded(&m); err != nil {
+		return MemoryRegions{}, err
+	}
 
 	// Calculate head room
 	c.calculateHeadRoom(&m)
@@ -327,20 +329,31 @@ func (c Calculator) setStack(flag string, m *MemoryRegions) error {
 }
 
 // calculateMetaspaceIfNeeded calculates metaspace if not already configured by user
-func (c Calculator) calculateMetaspaceIfNeeded(m *MemoryRegions) {
+func (c Calculator) calculateMetaspaceIfNeeded(m *MemoryRegions) error {
 	if m.Metaspace == nil {
+		classes, err := checkedMultiply("class metadata", int64(c.LoadedClassCount), ClassSize)
+		if err != nil {
+			return err
+		}
+		value, err := checkedAdd("metaspace", ClassOverhead, classes)
+		if err != nil {
+			return err
+		}
 		ms := Metaspace{
-			Value:      ClassOverhead + (int64(c.LoadedClassCount) * ClassSize),
+			Value:      value,
 			Provenance: Calculated,
 		}
 		m.Metaspace = &ms
 	}
+	return nil
 }
 
 // calculateHeadRoom calculates the head room based on total memory and percentage
 func (c Calculator) calculateHeadRoom(m *MemoryRegions) {
+	whole := (c.TotalMemory.Value / 100) * int64(c.HeadRoom)
+	remainder := ((c.TotalMemory.Value % 100) * int64(c.HeadRoom)) / 100
 	m.HeadRoom = &HeadRoom{
-		Value:      int64((float64(c.HeadRoom) / 100) * float64(c.TotalMemory.Value)),
+		Value:      whole + remainder,
 		Provenance: Calculated,
 	}
 }
@@ -393,8 +406,12 @@ func (c Calculator) validateNonHeapAndCalculateHeap(m *MemoryRegions) error {
 
 	// Calculate heap if not configured by user
 	if m.Heap == nil {
+		heap := c.TotalMemory.Value - n.Value
+		if heap <= 0 {
+			return fmt.Errorf("no memory remains for the heap after allocating non-heap regions: %s", m.NonHeapRegionsString(c.ThreadCount))
+		}
 		m.Heap = &Heap{
-			Value:      c.TotalMemory.Value - n.Value,
+			Value:      heap,
 			Provenance: Calculated,
 		}
 	}
@@ -403,6 +420,16 @@ func (c Calculator) validateNonHeapAndCalculateHeap(m *MemoryRegions) error {
 
 // validateAllRegions performs final validation that all regions fit within total memory
 func (c Calculator) validateAllRegions(m *MemoryRegions) error {
+	if m.Heap == nil || m.Heap.Value <= 0 {
+		return fmt.Errorf("heap must be positive")
+	}
+	if m.Metaspace == nil || m.Metaspace.Value <= 0 {
+		return fmt.Errorf("metaspace must be positive")
+	}
+	if m.DirectMemory.Value <= 0 || m.ReservedCodeCache.Value <= 0 || m.Stack.Value <= 0 {
+		return fmt.Errorf("direct memory, reserved code cache, and thread stack must be positive")
+	}
+
 	a, err := m.AllRegionsSize(c.ThreadCount)
 	if err != nil {
 		return fmt.Errorf("unable to calculate all regions size\n%w", err)

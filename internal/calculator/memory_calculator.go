@@ -21,6 +21,7 @@ package calculator
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/patbaumgartner/memory-calculator/internal/calc"
@@ -95,6 +96,10 @@ func (r Result) Environment() map[string]string {
 
 // Execute performs the memory calculation from typed input.
 func (m MemoryCalculator) Execute(input Input) (Result, error) {
+	if err := validateInput(input); err != nil {
+		return Result{}, err
+	}
+
 	c := calc.Calculator{
 		HeadRoom:    input.HeadRoom,
 		ThreadCount: input.ThreadCount,
@@ -177,16 +182,85 @@ func (m MemoryCalculator) calculateClassCount(c *calc.Calculator, input Input) e
 		return fmt.Errorf("unable to determine class count\n%w", err)
 	}
 
-	totalClasses := float64(input.JVMClassCount+appClassCount+agentClassCount+input.StaticAdjustment) *
-		(float64(input.AdjustmentFactor) / 100.0)
-
 	m.Logger.Debugf(
 		"Memory Calculation: (%d%% * (%d + %d + %d + %d)) * %0.2f",
 		input.AdjustmentFactor, input.JVMClassCount, appClassCount, agentClassCount,
 		input.StaticAdjustment, ClassLoadFactor)
 
-	c.LoadedClassCount = int(totalClasses * ClassLoadFactor)
+	loadedClassCount, err := adjustedClassCount(
+		input.JVMClassCount, appClassCount, agentClassCount,
+		input.StaticAdjustment, input.AdjustmentFactor)
+	if err != nil {
+		return err
+	}
+	c.LoadedClassCount = loadedClassCount
 	return nil
+}
+
+func validateInput(input Input) error {
+	if input.ThreadCount < 0 {
+		return fmt.Errorf("thread count must not be negative, got %d", input.ThreadCount)
+	}
+	if input.JVMClassCount < 0 {
+		return fmt.Errorf("JVM class count must not be negative, got %d", input.JVMClassCount)
+	}
+	if input.AdjustmentFactor < 0 {
+		return fmt.Errorf("class adjustment factor must not be negative, got %d", input.AdjustmentFactor)
+	}
+	if input.ApplicationPath == "" && input.LoadedClassCount == nil {
+		return fmt.Errorf("application path must not be empty when class count is calculated")
+	}
+	return nil
+}
+
+func adjustedClassCount(jvm, app, agent, static, factor int) (int, error) {
+	base, err := addClassCounts(int64(jvm), int64(app), int64(agent), int64(static))
+	if err != nil {
+		return 0, err
+	}
+	if base < 0 {
+		return 0, fmt.Errorf("class count adjustments produce a negative total: %d", base)
+	}
+
+	// floor(base * factor * 35 / 10_000), reduced before multiplication to avoid overflow.
+	values := []int64{base, int64(factor), 35}
+	denominator := int64(10_000)
+	for i := range values {
+		divisor := greatestCommonDivisor(values[i], denominator)
+		values[i] /= divisor
+		denominator /= divisor
+	}
+
+	product := int64(1)
+	for _, value := range values {
+		if value != 0 && product > math.MaxInt64/value {
+			return 0, fmt.Errorf("adjusted class count overflows the maximum supported value")
+		}
+		product *= value
+	}
+	result := product / denominator
+	if result > int64(math.MaxInt) {
+		return 0, fmt.Errorf("adjusted class count %d does not fit in an int", result)
+	}
+	return int(result), nil
+}
+
+func addClassCounts(values ...int64) (int64, error) {
+	var total int64
+	for _, value := range values {
+		if value > 0 && total > math.MaxInt64-value || value < 0 && total < math.MinInt64-value {
+			return 0, fmt.Errorf("class count total overflows the supported range")
+		}
+		total += value
+	}
+	return total, nil
+}
+
+func greatestCommonDivisor(left, right int64) int64 {
+	for right != 0 {
+		left, right = right, left%right
+	}
+	return left
 }
 
 // determineTotalMemory uses an explicit memory budget or detects one from cgroups and host memory.

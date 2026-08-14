@@ -21,9 +21,19 @@ func (m MemoryRegions) FixedRegionsSize(threadCount int) (Size, error) {
 		return Size{}, fmt.Errorf("unable to calculate fixed regions size without metaspace")
 	}
 
+	stacks, err := checkedMultiply("thread stack memory", m.Stack.Value, int64(threadCount))
+	if err != nil {
+		return Size{}, err
+	}
+
+	total, err := checkedAdd("fixed memory regions",
+		m.DirectMemory.Value, m.Metaspace.Value, m.ReservedCodeCache.Value, stacks)
+	if err != nil {
+		return Size{}, err
+	}
+
 	return Size{
-		Value: m.DirectMemory.Value + m.Metaspace.Value + m.ReservedCodeCache.Value +
-			(m.Stack.Value * int64(threadCount)),
+		Value:      total,
 		Provenance: Calculated,
 	}, nil
 }
@@ -53,8 +63,13 @@ func (m MemoryRegions) NonHeapRegionsSize(threadCount int) (Size, error) {
 		return Size{}, fmt.Errorf("unable to calculate fixed regions size\n%w", err)
 	}
 
+	total, err := checkedAdd("non-heap memory regions", m.HeadRoom.Value, s.Value)
+	if err != nil {
+		return Size{}, err
+	}
+
 	return Size{
-		Value:      m.HeadRoom.Value + s.Value,
+		Value:      total,
 		Provenance: Calculated,
 	}, nil
 }
@@ -82,8 +97,13 @@ func (m MemoryRegions) AllRegionsSize(threadCount int) (Size, error) {
 		return Size{}, fmt.Errorf("unable to calculate non-heap regions size\n%w", err)
 	}
 
+	total, err := checkedAdd("all memory regions", s.Value, m.Heap.Value)
+	if err != nil {
+		return Size{}, err
+	}
+
 	return Size{
-		Value:      s.Value + m.Heap.Value,
+		Value:      total,
 		Provenance: Calculated,
 	}, nil
 }
