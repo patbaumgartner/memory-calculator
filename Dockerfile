@@ -82,5 +82,5 @@ LABEL maintainer="Patrick Baumgartner <contact@patbaumgartner.com>" \
     version="${VERSION}" \
     build.time="${BUILD_TIME}" \
     build.commit="${COMMIT_HASH}" \
-    alpine.version="3.20" \
+    alpine.version="3.21" \
     go.version="1.25.5"
