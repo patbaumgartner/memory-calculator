@@ -1,7 +1,7 @@
 # Test Suite
 
 The test suite covers every package used by the shipped binary. Current total statement coverage is
-**84.8%**; CI also runs the suite with the race detector.
+**84.2%**; CI also runs the suite with the race detector.
 
 ## Run it
 

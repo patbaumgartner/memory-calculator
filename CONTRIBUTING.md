@@ -87,7 +87,7 @@ A meaningful change needs a test at the right level:
 Use `t.Setenv`, `t.TempDir` and subtests. Do not call `t.Parallel` in tests that mutate package globals
 or process-wide state. Never delete a failing test or reduce its assertion to make CI green.
 
-Current total statement coverage is 84.8%. Coverage is a signal, not the objective: `internal/count`
+Current total statement coverage is 84.2%. Coverage is a signal, not the objective: `internal/count`
 has the lowest percentage because archive and I/O error paths are expensive to enumerate, while the
 safety-critical calculator and detectors are above 85% and carry invariant tests.
 
