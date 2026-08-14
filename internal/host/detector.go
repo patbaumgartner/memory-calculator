@@ -1,4 +1,4 @@
-// Package host handles host system memory detection across different operating systems.
+// Package host reads how much memory the host system has available.
 package host
 
 import (
@@ -10,50 +10,57 @@ import (
 )
 
 const (
-	// LinuxMemInfoPath is the path to /proc/meminfo on Linux systems
+	// LinuxMemInfoPath is the path to /proc/meminfo on Linux systems.
 	LinuxMemInfoPath = "/proc/meminfo"
 
-	// Platform constants
-	platformLinux  = "linux"
-	platformDarwin = "darwin"
+	platformLinux = "linux"
+
+	availableKey = "MemAvailable:"
+	totalKey     = "MemTotal:"
 )
 
-// Detector handles host system memory detection.
+// Detector reads host memory information.
 type Detector struct {
-	// MemInfoPath is the path to memory information (Linux only)
+	// MemInfoPath is the path to memory information (Linux only).
 	MemInfoPath string
 }
 
-// Create creates a new host memory detector with default paths.
+// Create creates a host memory detector using the standard Linux path.
 func Create() *Detector {
-	return &Detector{
-		MemInfoPath: LinuxMemInfoPath,
-	}
+	return &Detector{MemInfoPath: LinuxMemInfoPath}
 }
 
-// CreateWithPath creates a new host memory detector with custom path (useful for testing).
+// CreateWithPath creates a host memory detector reading from a specific path.
 func CreateWithPath(memInfoPath string) *Detector {
-	return &Detector{
-		MemInfoPath: memInfoPath,
-	}
+	return &Detector{MemInfoPath: memInfoPath}
 }
 
-// DetectHostMemory attempts to detect total system memory based on the operating system.
-// Returns 0 if memory detection fails or is not supported on the current platform.
-func (d *Detector) DetectHostMemory() int64 {
-	switch runtime.GOOS {
-	case platformLinux:
-		return d.detectLinuxMemory()
-	case platformDarwin:
-		return d.detectDarwinMemory()
-	default:
-		return 0 // Unsupported platform
+// DetectAvailableMemory reports memory available for a new workload, or 0 when it cannot be
+// determined.
+//
+// This reads MemAvailable rather than MemTotal. Without a cgroup limit the process may share the
+// host with everything else running on it, and sizing a heap against total RAM would overcommit a
+// busy machine. MemAvailable is the kernel's own estimate of what can be allocated without
+// swapping, which is the conservative choice and matches the Paketo calculator this tool mirrors.
+//
+// Only Linux is supported. Other platforms return 0 so the caller can apply its documented
+// default rather than act on a guess.
+func (d *Detector) DetectAvailableMemory() int64 {
+	if runtime.GOOS != platformLinux {
+		return 0
 	}
+
+	if available := d.readMemInfo(availableKey); available > 0 {
+		return available
+	}
+
+	// Kernels before 3.14 do not report MemAvailable.
+	return d.readMemInfo(totalKey)
 }
 
-// detectLinuxMemory reads total memory from /proc/meminfo on Linux.
-func (d *Detector) detectLinuxMemory() int64 {
-	file, err := os.Open(d.MemInfoPath)
+// readMemInfo returns the named /proc/meminfo value in bytes.
+func (d *Detector) readMemInfo(key string) int64 {
+	file, err := os.Open(d.MemInfoPath) // #nosec G304 - configurable only for tests
 	if err != nil {
 		return 0
 	}
@@ -62,61 +69,45 @@ func (d *Detector) detectLinuxMemory() int64 {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		if strings.HasPrefix(line, "MemTotal:") {
-			// Format: "MemTotal:        8062332 kB"
-			fields := strings.Fields(line)
-			if len(fields) >= 2 {
-				if memKB, err := strconv.ParseInt(fields[1], 10, 64); err == nil {
-					// Convert from KB to bytes
-					return memKB * 1024
-				}
-			}
+		if !strings.HasPrefix(line, key) {
+			continue
 		}
+
+		// Format: "MemAvailable:    8062332 kB"
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			return 0
+		}
+
+		value, err := strconv.ParseInt(fields[1], 10, 64)
+		if err != nil || value < 0 {
+			return 0
+		}
+
+		return value * unitMultiplier(fields)
 	}
 
 	return 0
 }
 
-// detectDarwinMemory detects memory on macOS using system calls.
-// Note: This requires CGO to be enabled, so we'll implement a CGO-free version
-// using runtime.ReadMemStats() which gives us a reasonable approximation.
-func (d *Detector) detectDarwinMemory() int64 {
-	// For cross-platform compatibility without CGO, we use a heuristic
-	// based on Go's memory stats and some reasonable assumptions
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-
-	// This is a heuristic - typically the heap limit is much smaller than total system memory
-	// We'll estimate total memory as roughly 16x the current heap size (conservative estimate)
-	// This isn't perfect but provides a reasonable fallback without CGO dependencies
-	if m.Sys > 0 {
-		// Estimate system memory based on allocated system memory
-		// This is a rough approximation - real implementation would use syscalls
-		estimatedTotal := m.Sys * 32 // Conservative multiplier
-
-		// Cap at reasonable values (between 1GB and 128GB)
-		const minMemory = 1024 * 1024 * 1024       // 1GB
-		const maxMemory = 128 * 1024 * 1024 * 1024 // 128GB
-
-		if estimatedTotal < minMemory {
-			return minMemory
-		}
-		if estimatedTotal > maxMemory {
-			return maxMemory
-		}
-
-		return int64(estimatedTotal)
+func unitMultiplier(fields []string) int64 {
+	if len(fields) < 3 {
+		return 1
 	}
 
-	return 0
-}
-
-// IsHostMemoryDetectionSupported returns true if host memory detection is supported on the current platform.
-func IsHostMemoryDetectionSupported() bool {
-	switch runtime.GOOS {
-	case platformLinux, platformDarwin:
-		return true
+	switch strings.ToLower(fields[2]) {
+	case "kb":
+		return 1024
+	case "mb":
+		return 1024 * 1024
+	case "gb":
+		return 1024 * 1024 * 1024
 	default:
-		return false
+		return 1
 	}
+}
+
+// IsHostMemoryDetectionSupported reports whether host memory can be read on this platform.
+func IsHostMemoryDetectionSupported() bool {
+	return runtime.GOOS == platformLinux
 }

@@ -105,9 +105,7 @@ func TestExecuteWithClassCounting(t *testing.T) {
 	}
 }
 
-func TestParseMemoryString(t *testing.T) {
-	mc := Create(true)
-
+func TestDetermineTotalMemoryFromEnvironment(t *testing.T) {
 	tests := []struct {
 		input    string
 		expected int64
@@ -117,25 +115,32 @@ func TestParseMemoryString(t *testing.T) {
 		{"512M", 536870912, false},
 		{"1024K", 1048576, false},
 		{"2048", 2048, false},
+		{"1.5G", 1610612736, false},
 		{"invalid", 0, true},
-		{"", 0, true},
+		{"2X", 0, true},
+		{"-1G", 0, true},
 	}
 
 	for _, test := range tests {
-		result, err := mc.parseMemoryString(test.input)
+		t.Run(test.input, func(t *testing.T) {
+			t.Setenv("BPL_JVM_TOTAL_MEMORY", test.input)
 
-		if test.hasError {
-			if err == nil {
-				t.Errorf("Expected error for input %s", test.input)
+			size, err := Create(true).determineTotalMemory()
+
+			if test.hasError {
+				if err == nil {
+					t.Errorf("determineTotalMemory() = %d, want an error", size.Value)
+				}
+				return
 			}
-		} else {
+
 			if err != nil {
-				t.Errorf("Unexpected error for input %s: %v", test.input, err)
+				t.Errorf("determineTotalMemory() error = %v", err)
 			}
-			if result != test.expected {
-				t.Errorf("Input %s: expected %d, got %d", test.input, test.expected, result)
+			if size.Value != test.expected {
+				t.Errorf("determineTotalMemory() = %d, want %d", size.Value, test.expected)
 			}
-		}
+		})
 	}
 }
 

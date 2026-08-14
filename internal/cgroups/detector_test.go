@@ -6,555 +6,221 @@ import (
 	"testing"
 
 	"github.com/patbaumgartner/memory-calculator/internal/host"
-	"github.com/patbaumgartner/memory-calculator/pkg/errors"
 )
 
-func TestCreateDetector(t *testing.T) {
-	detector := Create()
+// fixture builds a cgroup tree on disk. Keys are paths relative to the temp root.
+func fixture(t *testing.T, files map[string]string) string {
+	t.Helper()
 
-	if detector == nil {
-		t.Error("Expected non-nil detector")
-		return
+	root := t.TempDir()
+	for name, contents := range files {
+		full := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatalf("MkdirAll(%s): %v", full, err)
+		}
+		if err := os.WriteFile(full, []byte(contents), 0o600); err != nil {
+			t.Fatalf("WriteFile(%s): %v", full, err)
+		}
 	}
 
-	if detector.CgroupsV2Path != "/sys/fs/cgroup/memory.max" {
-		t.Errorf("Expected v2 path '/sys/fs/cgroup/memory.max', got '%s'", detector.CgroupsV2Path)
-	}
+	return root
+}
 
-	if detector.CgroupsV1Path != "/sys/fs/cgroup/memory/memory.limit_in_bytes" {
-		t.Errorf("Expected v1 path '/sys/fs/cgroup/memory/memory.limit_in_bytes', got '%s'", detector.CgroupsV1Path)
-	}
-
-	if detector.HostDetector == nil {
-		t.Error("Expected non-nil host detector")
+// detector wires a Detector at the fixture root with host detection disabled unless given.
+func detector(root string, hostDetector *host.Detector) *Detector {
+	return &Detector{
+		V2Root:       filepath.Join(root, "v2"),
+		V1Root:       filepath.Join(root, "v1"),
+		ProcCgroup:   filepath.Join(root, "proc-cgroup"),
+		HostDetector: hostDetector,
 	}
 }
 
-func TestCreateDetectorWithPaths(t *testing.T) {
-	v2Path := "/custom/v2/path"
-	v1Path := "/custom/v1/path"
-
-	detector := CreateWithPaths(v2Path, v1Path)
-
-	if detector == nil {
-		t.Error("Expected non-nil detector")
-		return
-	}
-
-	if detector.CgroupsV2Path != v2Path {
-		t.Errorf("Expected v2 path '%s', got '%s'", v2Path, detector.CgroupsV2Path)
-	}
-
-	if detector.CgroupsV1Path != v1Path {
-		t.Errorf("Expected v1 path '%s', got '%s'", v1Path, detector.CgroupsV1Path)
-	}
-
-	if detector.HostDetector == nil {
-		t.Error("Expected non-nil host detector")
-	}
-}
-
-func TestCreateDetectorWithPathsAndHost(t *testing.T) {
-	v2Path := "/custom/v2/path"
-	v1Path := "/custom/v1/path"
-	hostDetector := host.Create()
-
-	detector := CreateWithPathsAndHost(v2Path, v1Path, hostDetector)
-
-	if detector == nil {
-		t.Error("Expected non-nil detector")
-		return
-	}
-
-	if detector.CgroupsV2Path != v2Path {
-		t.Errorf("Expected v2 path '%s', got '%s'", v2Path, detector.CgroupsV2Path)
-	}
-
-	if detector.CgroupsV1Path != v1Path {
-		t.Errorf("Expected v1 path '%s', got '%s'", v1Path, detector.CgroupsV1Path)
-	}
-
-	if detector.HostDetector != hostDetector {
-		t.Error("Expected the same host detector instance")
-	}
-}
-
-func TestReadCgroupsV2(t *testing.T) {
-	// Create temporary test files
-	tempDir, err := os.MkdirTemp("", "cgroups_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
+func TestDetect(t *testing.T) {
 	tests := []struct {
-		name        string
-		fileContent string
-		expected    int64
-		expectError bool
-		errorCode   errors.ErrorCode
+		name       string
+		files      map[string]string
+		wantLimit  int64
+		wantSource Source
 	}{
 		{
-			name:        "Valid memory limit",
-			fileContent: "2147483648\n",
-			expected:    2147483648,
-			expectError: false,
+			name:       "cgroup v2 limit",
+			files:      map[string]string{"v2/memory.max": "536870912\n"},
+			wantLimit:  536870912,
+			wantSource: SourceCgroupV2,
 		},
 		{
-			name:        "No limit (max)",
-			fileContent: "max\n",
-			expected:    0,
-			expectError: false,
+			name:       "cgroup v2 unlimited falls through",
+			files:      map[string]string{"v2/memory.max": "max\n"},
+			wantSource: SourceNone,
 		},
 		{
-			name:        "Large unrealistic limit",
-			fileContent: "9223372036854775807\n", // Very large number
-			expected:    0,
-			expectError: false,
+			name:       "cgroup v1 limit",
+			files:      map[string]string{"v1/memory.limit_in_bytes": "268435456\n"},
+			wantLimit:  268435456,
+			wantSource: SourceCgroupV1,
 		},
 		{
-			name:        "Zero limit",
-			fileContent: "0\n",
-			expected:    0,
-			expectError: false,
+			name: "cgroup v2 wins over v1 on a hybrid system",
+			files: map[string]string{
+				"v2/memory.max":            "536870912\n",
+				"v1/memory.limit_in_bytes": "268435456\n",
+			},
+			wantLimit:  536870912,
+			wantSource: SourceCgroupV2,
 		},
 		{
-			name:        "Invalid format",
-			fileContent: "invalid\n",
-			expected:    0,
-			expectError: true,
-			errorCode:   errors.ErrCgroupsAccess,
+			name:       "cgroup v1 page-counter maximum means unlimited",
+			files:      map[string]string{"v1/memory.limit_in_bytes": "9223372036854771712\n"},
+			wantSource: SourceNone,
 		},
 		{
-			name:        "Empty file",
-			fileContent: "",
-			expected:    0,
-			expectError: true,
-			errorCode:   errors.ErrCgroupsAccess,
+			name:       "cgroup v1 64KiB-page maximum means unlimited",
+			files:      map[string]string{"v1/memory.limit_in_bytes": "9223372036854710272\n"},
+			wantSource: SourceNone,
+		},
+		{
+			name:       "cgroup v1 unsigned overflow means unlimited",
+			files:      map[string]string{"v1/memory.limit_in_bytes": "18446744073709551615\n"},
+			wantSource: SourceNone,
+		},
+		{
+			name:       "cgroup v1 negative one means unlimited",
+			files:      map[string]string{"v1/memory.limit_in_bytes": "-1\n"},
+			wantSource: SourceNone,
+		},
+		{
+			name:       "malformed limit is ignored",
+			files:      map[string]string{"v2/memory.max": "not-a-number\n"},
+			wantSource: SourceNone,
+		},
+		{
+			name:       "empty limit file is ignored",
+			files:      map[string]string{"v2/memory.max": ""},
+			wantSource: SourceNone,
+		},
+		{
+			name:       "missing files yield no detection",
+			files:      map[string]string{},
+			wantSource: SourceNone,
+		},
+		{
+			name:       "a limit above 1TiB is still a real limit",
+			files:      map[string]string{"v2/memory.max": "2199023255552\n"},
+			wantLimit:  2199023255552,
+			wantSource: SourceCgroupV2,
+		},
+		{
+			name: "an ancestor limit constrains an unlimited leaf",
+			files: map[string]string{
+				"proc-cgroup":                                "0::/kubepods/pod123/container456\n",
+				"v2/memory.max":                              "max\n",
+				"v2/kubepods/memory.max":                     "max\n",
+				"v2/kubepods/pod123/memory.max":              "268435456\n",
+				"v2/kubepods/pod123/container456/memory.max": "max\n",
+			},
+			wantLimit:  268435456,
+			wantSource: SourceCgroupV2,
+		},
+		{
+			name: "the tightest limit in the hierarchy wins",
+			files: map[string]string{
+				"proc-cgroup":                                "0::/kubepods/pod123/container456\n",
+				"v2/memory.max":                              "max\n",
+				"v2/kubepods/memory.max":                     "8589934592\n",
+				"v2/kubepods/pod123/memory.max":              "1073741824\n",
+				"v2/kubepods/pod123/container456/memory.max": "536870912\n",
+			},
+			wantLimit:  536870912,
+			wantSource: SourceCgroupV2,
+		},
+		{
+			name: "a leaf tighter than its ancestors wins",
+			files: map[string]string{
+				"proc-cgroup":                   "0::/kubepods/pod123\n",
+				"v2/memory.max":                 "max\n",
+				"v2/kubepods/memory.max":        "8589934592\n",
+				"v2/kubepods/pod123/memory.max": "134217728\n",
+			},
+			wantLimit:  134217728,
+			wantSource: SourceCgroupV2,
+		},
+		{
+			name: "cgroup v1 membership is read from the memory controller line",
+			files: map[string]string{
+				"proc-cgroup":                         "12:pids:/other\n4:cpu,memory:/docker/abc\n3:cpuset:/wrong\n",
+				"v1/memory.limit_in_bytes":            "9223372036854771712\n",
+				"v1/docker/abc/memory.limit_in_bytes": "67108864\n",
+			},
+			wantLimit:  67108864,
+			wantSource: SourceCgroupV1,
+		},
+		{
+			name: "a unified line is not used for cgroup v1 lookups",
+			files: map[string]string{
+				"proc-cgroup":                         "0::/docker/abc\n",
+				"v1/memory.limit_in_bytes":            "9223372036854771712\n",
+				"v1/docker/abc/memory.limit_in_bytes": "67108864\n",
+			},
+			wantSource: SourceNone,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create test file
-			testFile := filepath.Join(tempDir, "memory.max")
-			if tt.fileContent != "" {
-				err := os.WriteFile(testFile, []byte(tt.fileContent), 0o600)
-				if err != nil {
-					t.Fatalf("Failed to write test file: %v", err)
-				}
+			got := detector(fixture(t, tt.files), nil).Detect()
+
+			if got.Source != tt.wantSource {
+				t.Errorf("Source = %q, want %q", got.Source, tt.wantSource)
 			}
-
-			detector := CreateWithPaths(testFile, "")
-			result, err := detector.readCgroupsV2()
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-					return
-				}
-
-				if mcErr, ok := err.(*errors.MemoryCalculatorError); ok {
-					if mcErr.Code != tt.errorCode {
-						t.Errorf("Expected error code %v, got %v", tt.errorCode, mcErr.Code)
-					}
-				} else {
-					t.Errorf("Expected MemoryCalculatorError, got %T", err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if result != tt.expected {
-					t.Errorf("Expected %d, got %d", tt.expected, result)
-				}
+			if got.Limit != tt.wantLimit {
+				t.Errorf("Limit = %d, want %d", got.Limit, tt.wantLimit)
 			}
-
-			// Clean up test file
-			_ = os.Remove(testFile)
+			if got.Found() != (tt.wantLimit > 0) {
+				t.Errorf("Found() = %t, want %t", got.Found(), tt.wantLimit > 0)
+			}
 		})
 	}
 }
 
-func TestReadCgroupsV1(t *testing.T) {
-	// Create temporary test files
-	tempDir, err := os.MkdirTemp("", "cgroups_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	tests := []struct {
-		name        string
-		fileContent string
-		expected    int64
-		expectError bool
-		errorCode   errors.ErrorCode
-	}{
-		{
-			name:        "Valid memory limit",
-			fileContent: "2147483648\n",
-			expected:    2147483648,
-			expectError: false,
-		},
-		{
-			name:        "Large unrealistic limit",
-			fileContent: "9223372036854775807\n", // Very large number (no limit)
-			expected:    0,
-			expectError: false,
-		},
-		{
-			name:        "Zero limit",
-			fileContent: "0\n",
-			expected:    0,
-			expectError: false,
-		},
-		{
-			name:        "Invalid format",
-			fileContent: "invalid\n",
-			expected:    0,
-			expectError: true,
-			errorCode:   errors.ErrCgroupsAccess,
-		},
-		{
-			name:        "Empty file",
-			fileContent: "",
-			expected:    0,
-			expectError: true,
-			errorCode:   errors.ErrCgroupsAccess,
-		},
+func TestDetectFallsBackToHost(t *testing.T) {
+	root := fixture(t, map[string]string{"v2/memory.max": "max\n"})
+	meminfo := filepath.Join(root, "meminfo")
+	if err := os.WriteFile(meminfo, []byte("MemTotal: 16000000 kB\nMemAvailable: 8000000 kB\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create test file
-			testFile := filepath.Join(tempDir, "memory.limit_in_bytes")
-			if tt.fileContent != "" {
-				err := os.WriteFile(testFile, []byte(tt.fileContent), 0o600)
-				if err != nil {
-					t.Fatalf("Failed to write test file: %v", err)
-				}
-			}
+	got := detector(root, host.CreateWithPath(meminfo)).Detect()
 
-			detector := CreateWithPaths("", testFile)
-			result, err := detector.readCgroupsV1()
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Expected error but got none")
-					return
-				}
-
-				if mcErr, ok := err.(*errors.MemoryCalculatorError); ok {
-					if mcErr.Code != tt.errorCode {
-						t.Errorf("Expected error code %v, got %v", tt.errorCode, mcErr.Code)
-					}
-				} else {
-					t.Errorf("Expected MemoryCalculatorError, got %T", err)
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-				}
-				if result != tt.expected {
-					t.Errorf("Expected %d, got %d", tt.expected, result)
-				}
-			}
-
-			// Clean up test file
-			_ = os.Remove(testFile)
-		})
+	if got.Source != SourceHost {
+		t.Errorf("Source = %q, want %q", got.Source, SourceHost)
+	}
+	if want := int64(8000000 * 1024); got.Limit != want {
+		t.Errorf("Limit = %d, want %d (MemAvailable, not MemTotal)", got.Limit, want)
 	}
 }
 
-func TestDetectContainerMemory(t *testing.T) {
-	// Create temporary test files
-	tempDir, err := os.MkdirTemp("", "cgroups_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	tests := []struct {
-		name          string
-		v2FileContent string
-		v1FileContent string
-		createV2File  bool
-		createV1File  bool
-		expected      int64
-	}{
-		{
-			name:          "V2 available with valid limit",
-			v2FileContent: "2147483648\n",
-			createV2File:  true,
-			expected:      2147483648,
-		},
-		{
-			name:          "V2 available but no limit, V1 has limit",
-			v2FileContent: "max\n",
-			v1FileContent: "1073741824\n",
-			createV2File:  true,
-			createV1File:  true,
-			expected:      1073741824,
-		},
-		{
-			name:          "Only V1 available",
-			v1FileContent: "1073741824\n",
-			createV1File:  true,
-			expected:      1073741824,
-		},
-		{
-			name:     "No cgroups files available",
-			expected: 0, // Will fall back to host detection, but we mock it to return 0
-		},
-		{
-			name:          "V2 has unrealistic limit, V1 has valid limit",
-			v2FileContent: "9223372036854775807\n",
-			v1FileContent: "1073741824\n",
-			createV2File:  true,
-			createV1File:  true,
-			expected:      1073741824,
-		},
-		{
-			name:          "Both files have unrealistic limits",
-			v2FileContent: "9223372036854775807\n",
-			v1FileContent: "9223372036854775807\n",
-			createV2File:  true,
-			createV1File:  true,
-			expected:      0, // Will fall back to host detection, but we mock it to return 0
-		},
+func TestDetectPrefersCgroupOverHost(t *testing.T) {
+	root := fixture(t, map[string]string{"v2/memory.max": "268435456\n"})
+	meminfo := filepath.Join(root, "meminfo")
+	if err := os.WriteFile(meminfo, []byte("MemAvailable: 8000000 kB\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			v2File := filepath.Join(tempDir, "memory.max")
-			v1File := filepath.Join(tempDir, "memory.limit_in_bytes")
+	got := detector(root, host.CreateWithPath(meminfo)).Detect()
 
-			// Create test files if needed
-			if tt.createV2File {
-				err := os.WriteFile(v2File, []byte(tt.v2FileContent), 0o600)
-				if err != nil {
-					t.Fatalf("Failed to write V2 test file: %v", err)
-				}
-			}
-
-			if tt.createV1File {
-				err := os.WriteFile(v1File, []byte(tt.v1FileContent), 0o600)
-				if err != nil {
-					t.Fatalf("Failed to write V1 test file: %v", err)
-				}
-			}
-
-			detector := CreateWithPathsAndHost(v2File, v1File, host.CreateWithPath("/nonexistent/meminfo"))
-			result := detector.DetectContainerMemory()
-
-			if result != tt.expected {
-				t.Errorf("Expected %d, got %d", tt.expected, result)
-			}
-
-			// Clean up test files
-			_ = os.Remove(v2File)
-			_ = os.Remove(v1File)
-		})
+	if got.Source != SourceCgroupV2 || got.Limit != 268435456 {
+		t.Errorf("Detect() = %+v, want the cgroup limit rather than host memory", got)
 	}
 }
 
-func TestDetectContainerMemoryWithHostFallback(t *testing.T) {
-	// Create temporary test files
-	tempDir, err := os.MkdirTemp("", "cgroups_host_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
+func TestCreateUsesStandardPaths(t *testing.T) {
+	d := Create()
+
+	if d.V2Root != DefaultV2Root || d.V1Root != DefaultV1Root || d.ProcCgroup != DefaultProcCgroup {
+		t.Errorf("Create() = %+v, want the documented default paths", d)
 	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	tests := []struct {
-		name               string
-		v2FileContent      string
-		v1FileContent      string
-		createV2File       bool
-		createV1File       bool
-		hostMemInfoContent string
-		createHostMemInfo  bool
-		expected           int64
-		description        string
-	}{
-		{
-			name:          "Cgroups V2 available, no host fallback needed",
-			v2FileContent: "2147483648\n",
-			createV2File:  true,
-			expected:      2147483648,
-			description:   "Should use cgroups V2 and not call host detection",
-		},
-		{
-			name:          "Cgroups V1 available, no host fallback needed",
-			v1FileContent: "1073741824\n",
-			createV1File:  true,
-			expected:      1073741824,
-			description:   "Should use cgroups V1 and not call host detection",
-		},
-		{
-			name: "No cgroups, fallback to host memory detection",
-			hostMemInfoContent: `MemTotal:        8062332 kB
-MemFree:         1234567 kB
-MemAvailable:    2345678 kB`,
-			createHostMemInfo: true,
-			expected:          8062332 * 1024, // Convert KB to bytes
-			description:       "Should fallback to host detection when cgroups unavailable",
-		},
-		{
-			name:          "Cgroups unrealistic limits, fallback to host",
-			v2FileContent: "9223372036854775807\n",
-			v1FileContent: "9223372036854775807\n",
-			createV2File:  true,
-			createV1File:  true,
-			hostMemInfoContent: `MemTotal:        4031166 kB
-MemFree:          654321 kB`,
-			createHostMemInfo: true,
-			expected:          4031166 * 1024,
-			description:       "Should fallback to host when cgroups have unrealistic limits",
-		},
-		{
-			name:        "All detection methods fail",
-			expected:    0,
-			description: "Should return 0 when all detection methods fail",
-		},
-		{
-			name: "Host meminfo invalid, should return 0",
-			hostMemInfoContent: `MemFree:         1234567 kB
-MemAvailable:    2345678 kB`,
-			createHostMemInfo: true,
-			expected:          0,
-			description:       "Should return 0 when host meminfo doesn't contain MemTotal",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			v2File := filepath.Join(tempDir, "memory.max")
-			v1File := filepath.Join(tempDir, "memory.limit_in_bytes")
-			hostMemInfoFile := filepath.Join(tempDir, "meminfo")
-
-			// Create cgroups test files if needed
-			if tt.createV2File {
-				err := os.WriteFile(v2File, []byte(tt.v2FileContent), 0o600)
-				if err != nil {
-					t.Fatalf("Failed to write V2 test file: %v", err)
-				}
-			}
-
-			if tt.createV1File {
-				err := os.WriteFile(v1File, []byte(tt.v1FileContent), 0o600)
-				if err != nil {
-					t.Fatalf("Failed to write V1 test file: %v", err)
-				}
-			}
-
-			// Create host meminfo file if needed
-			if tt.createHostMemInfo {
-				err := os.WriteFile(hostMemInfoFile, []byte(tt.hostMemInfoContent), 0o600)
-				if err != nil {
-					t.Fatalf("Failed to write host meminfo test file: %v", err)
-				}
-			}
-
-			// Create detector with custom host detector
-			hostDetector := host.CreateWithPath(hostMemInfoFile)
-			detector := CreateWithPathsAndHost(v2File, v1File, hostDetector)
-
-			result := detector.DetectContainerMemory()
-
-			if result != tt.expected {
-				t.Errorf("Expected %d, got %d (%s)", tt.expected, result, tt.description)
-			}
-
-			// Clean up test files
-			_ = os.Remove(v2File)
-			_ = os.Remove(v1File)
-			_ = os.Remove(hostMemInfoFile)
-		})
-	}
-}
-
-func TestHostFallbackPriority(t *testing.T) {
-	// Create temporary test files
-	tempDir, err := os.MkdirTemp("", "priority_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	v2File := filepath.Join(tempDir, "memory.max")
-	v1File := filepath.Join(tempDir, "memory.limit_in_bytes")
-	hostMemInfoFile := filepath.Join(tempDir, "meminfo")
-
-	// Create all files with different values
-	err = os.WriteFile(v2File, []byte("2147483648\n"), 0o600) // 2GB
-	if err != nil {
-		t.Fatalf("Failed to write V2 test file: %v", err)
-	}
-
-	err = os.WriteFile(v1File, []byte("1073741824\n"), 0o600) // 1GB
-	if err != nil {
-		t.Fatalf("Failed to write V1 test file: %v", err)
-	}
-
-	hostMemInfo := `MemTotal:        8062332 kB
-MemFree:         1234567 kB`
-	err = os.WriteFile(hostMemInfoFile, []byte(hostMemInfo), 0o600) // ~8GB
-	if err != nil {
-		t.Fatalf("Failed to write host meminfo test file: %v", err)
-	}
-
-	hostDetector := host.CreateWithPath(hostMemInfoFile)
-	detector := CreateWithPathsAndHost(v2File, v1File, hostDetector)
-
-	result := detector.DetectContainerMemory()
-
-	// Should prioritize V2 (2GB) over V1 (1GB) and host (~8GB)
-	expected := int64(2147483648)
-	if result != expected {
-		t.Errorf("Expected V2 priority with %d bytes, got %d bytes", expected, result)
-	}
-}
-
-func TestFileNotFound(t *testing.T) {
-	// Use a mock host detector that also can't find files
-	detector := CreateWithPathsAndHost("/nonexistent/v2/path", "/nonexistent/v1/path",
-		host.CreateWithPath("/nonexistent/meminfo"))
-
-	// Should return 0 when files don't exist
-	result := detector.DetectContainerMemory()
-	if result != 0 {
-		t.Errorf("Expected 0 for nonexistent files, got %d", result)
-	}
-}
-
-func TestMaxRealisticMemoryConstant(t *testing.T) {
-	expected := int64(1024 * 1024 * 1024 * 1024) // 1TB
-	if MaxRealisticMemory != expected {
-		t.Errorf("Expected MaxRealisticMemory=%d, got %d", expected, MaxRealisticMemory)
-	}
-}
-
-// Benchmark tests
-func BenchmarkDetectContainerMemory(b *testing.B) {
-	// Create temporary test file
-	tempDir, err := os.MkdirTemp("", "cgroups_bench")
-	if err != nil {
-		b.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
-	v2File := filepath.Join(tempDir, "memory.max")
-	err = os.WriteFile(v2File, []byte("2147483648\n"), 0o600)
-	if err != nil {
-		b.Fatalf("Failed to write test file: %v", err)
-	}
-
-	detector := CreateWithPaths(v2File, "")
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		_ = detector.DetectContainerMemory()
+	if d.HostDetector == nil {
+		t.Error("Create() left HostDetector nil, so host fallback would never run")
 	}
 }
