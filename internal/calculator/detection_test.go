@@ -107,8 +107,8 @@ func TestExecuteSizesHeapFromDetectedLimit(t *testing.T) {
 				t.Fatalf("Execute() error = %v", err)
 			}
 
-			if got := heapFrom(t, result["JAVA_TOOL_OPTIONS"]); got != tt.want {
-				t.Errorf("heap = %s, want %s (from %s)", got, tt.want, result["JAVA_TOOL_OPTIONS"])
+			if got := heapFrom(t, result.JavaToolOptions); got != tt.want {
+				t.Errorf("heap = %s, want %s (from %s)", got, tt.want, result.JavaToolOptions)
 			}
 		})
 	}
@@ -142,7 +142,7 @@ func TestExecuteIgnoresUnlimitedCgroupValues(t *testing.T) {
 				t.Fatalf("Execute() error = %v", err)
 			}
 
-			if got, want := heapFrom(t, result["JAVA_TOOL_OPTIONS"]), "-Xmx175095K"; got != want {
+			if got, want := heapFrom(t, result.JavaToolOptions), "-Xmx175095K"; got != want {
 				t.Errorf("heap = %s, want %s: %q was treated as a real limit", got, want, sentinel)
 			}
 		})

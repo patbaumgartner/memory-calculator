@@ -46,7 +46,7 @@ check "quiet mode emits JVM flags" "-Xmx" \
   "$($BINARY --total-memory 2G --thread-count 100 --loaded-class-count 1000 --quiet --path "$FIXTURE")"
 check "quiet mode emits no decoration" "0" \
   "$($BINARY --total-memory 2G --loaded-class-count 1000 --quiet --path "$FIXTURE" | grep -c 'JVM Memory Configuration' || true)"
-check "verbose mode renders a report" "JVM Memory Configuration" \
+check "verbose mode reports the memory it used" "Total Memory:     2.00 GB" \
   "$($BINARY --total-memory 2G --loaded-class-count 1000 --path "$FIXTURE")"
 check "help lists the flags" "--total-memory" "$($BINARY --help)"
 check "version reports build info" "Version:" "$($BINARY --version)"

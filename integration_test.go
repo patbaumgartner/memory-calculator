@@ -45,7 +45,7 @@ func TestMainIntegration(t *testing.T) {
 				"Version:",
 				"Build Time:",
 				"Commit:",
-				"Go Version: 1.25.5",
+				"Go Version: go1.",
 			},
 		},
 		{

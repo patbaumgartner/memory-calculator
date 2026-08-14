@@ -33,8 +33,8 @@ func TestExecuteWithDefaultValues(t *testing.T) {
 	}
 
 	// Should return JVM options with defaults
-	javaOptions, exists := result["JAVA_TOOL_OPTIONS"]
-	if !exists || len(javaOptions) == 0 {
+	javaOptions := result.JavaToolOptions
+	if len(javaOptions) == 0 {
 		t.Error("Expected JAVA_TOOL_OPTIONS to be returned")
 	}
 
@@ -62,8 +62,8 @@ func TestExecuteWithEnvironmentVariables(t *testing.T) {
 	}
 
 	// Should return JVM options
-	javaOptions, exists := result["JAVA_TOOL_OPTIONS"]
-	if !exists || len(javaOptions) == 0 {
+	javaOptions := result.JavaToolOptions
+	if len(javaOptions) == 0 {
 		t.Error("Expected JAVA_TOOL_OPTIONS to be returned")
 	}
 }
@@ -99,8 +99,8 @@ func TestExecuteWithClassCounting(t *testing.T) {
 	}
 
 	// Should return JVM options
-	javaOptions, exists := result["JAVA_TOOL_OPTIONS"]
-	if !exists || len(javaOptions) == 0 {
+	javaOptions := result.JavaToolOptions
+	if len(javaOptions) == 0 {
 		t.Error("Expected JAVA_TOOL_OPTIONS to be returned")
 	}
 }

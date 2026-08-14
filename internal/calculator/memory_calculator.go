@@ -60,8 +60,30 @@ func Create(quiet bool) *MemoryCalculator {
 	}
 }
 
-// Execute performs the memory calculation and returns environment variables.
-func (m MemoryCalculator) Execute() (map[string]string, error) {
+// Result is the outcome of a memory calculation.
+type Result struct {
+	// JavaToolOptions is the complete JAVA_TOOL_OPTIONS value, including any options the caller
+	// already had set.
+	JavaToolOptions string
+	// TotalMemory is the memory budget the calculation was based on.
+	TotalMemory calc.Size
+	// Regions holds the individual memory regions that were calculated.
+	Regions calc.MemoryRegions
+	// ThreadCount is the thread count used to size stack memory.
+	ThreadCount int
+	// LoadedClassCount is the class count used to size metaspace.
+	LoadedClassCount int
+	// HeadRoom is the percentage of total memory that was reserved.
+	HeadRoom int
+}
+
+// Environment renders the result as environment variables to export.
+func (r Result) Environment() map[string]string {
+	return map[string]string{"JAVA_TOOL_OPTIONS": r.JavaToolOptions}
+}
+
+// Execute performs the memory calculation.
+func (m MemoryCalculator) Execute() (Result, error) {
 	c := calc.Calculator{
 		HeadRoom:    DefaultHeadroom,
 		ThreadCount: DefaultThreadCount,
@@ -69,11 +91,11 @@ func (m MemoryCalculator) Execute() (map[string]string, error) {
 
 	// Parse configuration from environment variables
 	if err := m.parseHeadroomConfig(&c); err != nil {
-		return nil, err
+		return Result{}, err
 	}
 
 	if err := m.parseThreadCountConfig(&c); err != nil {
-		return nil, err
+		return Result{}, err
 	}
 
 	var values []string
@@ -84,20 +106,20 @@ func (m MemoryCalculator) Execute() (map[string]string, error) {
 
 	// Parse class count configuration
 	if err := m.parseClassCountConfig(&c, opts); err != nil {
-		return nil, err
+		return Result{}, err
 	}
 
 	// Determine total memory
 	totalMemory, err := m.determineTotalMemory()
 	if err != nil {
-		return nil, err
+		return Result{}, err
 	}
 
 	c.TotalMemory = totalMemory
 
 	r, err := c.Calculate(opts)
 	if err != nil {
-		return nil, fmt.Errorf("unable to calculate memory configuration\n%w", err)
+		return Result{}, fmt.Errorf("unable to calculate memory configuration\n%w", err)
 	}
 
 	// Build calculated values
@@ -109,7 +131,14 @@ func (m MemoryCalculator) Execute() (map[string]string, error) {
 			"Loaded Class Count: %d, Headroom: %d%%)",
 		strings.Join(calculated, " "), c.TotalMemory, c.ThreadCount, c.LoadedClassCount, c.HeadRoom)
 
-	return map[string]string{"JAVA_TOOL_OPTIONS": strings.Join(values, " ")}, nil
+	return Result{
+		JavaToolOptions:  strings.Join(values, " "),
+		TotalMemory:      c.TotalMemory,
+		Regions:          r,
+		ThreadCount:      c.ThreadCount,
+		LoadedClassCount: c.LoadedClassCount,
+		HeadRoom:         c.HeadRoom,
+	}, nil
 }
 
 // CountAgentClasses counts classes in agent JARs.
