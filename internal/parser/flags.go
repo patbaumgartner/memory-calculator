@@ -17,7 +17,7 @@ const (
 
 // ParseFlags splits a JVM options string into individual arguments using POSIX-like shell word
 // rules: unquoted whitespace separates arguments, single quotes are literal, double quotes and
-// unquoted text honour backslash escapes, and a quoted section joins the word around it rather
+// unquoted text honor backslash escapes, and a quoted section joins the word around it rather
 // than becoming a word of its own.
 //
 // Unterminated quotes and dangling escapes are rejected, because silently mis-splitting a JVM
@@ -41,19 +41,9 @@ func ParseFlags(input string) ([]string, error) {
 			escaped = true
 			started = true
 
-		case r == '\'' && state == unquoted:
-			state = singleQuoted
+		case isQuoteTransition(r, state):
+			state = nextQuoteState(r, state)
 			started = true
-
-		case r == '"' && state == unquoted:
-			state = doubleQuoted
-			started = true
-
-		case r == '\'' && state == singleQuoted:
-			state = unquoted
-
-		case r == '"' && state == doubleQuoted:
-			state = unquoted
 
 		case state == unquoted && unicode.IsSpace(r):
 			if started {
@@ -81,4 +71,28 @@ func ParseFlags(input string) ([]string, error) {
 	}
 
 	return result, nil
+}
+
+// isQuoteTransition reports whether the rune opens or closes the current quoting context. A quote
+// character inside the opposite quoting style is literal text, not a delimiter.
+func isQuoteTransition(r rune, state quoteState) bool {
+	switch state {
+	case unquoted:
+		return r == '\'' || r == '"'
+	case singleQuoted:
+		return r == '\''
+	case doubleQuoted:
+		return r == '"'
+	}
+	return false
+}
+
+func nextQuoteState(r rune, state quoteState) quoteState {
+	if state != unquoted {
+		return unquoted
+	}
+	if r == '\'' {
+		return singleQuoted
+	}
+	return doubleQuoted
 }

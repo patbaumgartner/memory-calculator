@@ -220,7 +220,7 @@ func (c Calculator) Calculate(flags string) (MemoryRegions, error) {
 //
 // Every region size is subtracted from total memory to size the heap, so a negative count or
 // percentage inflates the heap beyond the container limit instead of shrinking it. That produces a
-// plausible-looking -Xmx that the container cannot honour, so it is rejected here rather than
+// plausible-looking -Xmx that the container cannot honor, so it is rejected here rather than
 // trusted from the caller.
 func (c Calculator) validate() error {
 	if c.TotalMemory.Value <= 0 {
@@ -408,7 +408,8 @@ func (c Calculator) validateNonHeapAndCalculateHeap(m *MemoryRegions) error {
 	if m.Heap == nil {
 		heap := c.TotalMemory.Value - n.Value
 		if heap <= 0 {
-			return fmt.Errorf("no memory remains for the heap after allocating non-heap regions: %s", m.NonHeapRegionsString(c.ThreadCount))
+			return fmt.Errorf("no memory remains for the heap after allocating non-heap regions: %s",
+				m.NonHeapRegionsString(c.ThreadCount))
 		}
 		m.Heap = &Heap{
 			Value:      heap,

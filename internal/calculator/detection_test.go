@@ -19,7 +19,7 @@ func calculatorAt(t *testing.T, files map[string]string) *MemoryCalculator {
 	root := t.TempDir()
 	for name, contents := range files {
 		full := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
 			t.Fatalf("MkdirAll(%s): %v", full, err)
 		}
 		if err := os.WriteFile(full, []byte(contents), 0o600); err != nil {

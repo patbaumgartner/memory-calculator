@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+const customAppPath = "/custom/app"
+
 func TestLoad(t *testing.T) {
 	// Clear any existing environment variables
 	_ = os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
@@ -43,7 +45,7 @@ func TestLoadWithEnvironmentVariables(t *testing.T) {
 	_ = os.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "15000")
 	_ = os.Setenv("BPL_JVM_THREAD_COUNT", "500")
 	_ = os.Setenv("BPL_JVM_HEAD_ROOM", "10")
-	_ = os.Setenv("BPI_APPLICATION_PATH", "/custom/app")
+	_ = os.Setenv("BPI_APPLICATION_PATH", customAppPath)
 
 	defer func() {
 		_ = os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
@@ -66,7 +68,7 @@ func TestLoadWithEnvironmentVariables(t *testing.T) {
 		t.Errorf("Expected head room '10', got '%s'", cfg.HeadRoom)
 	}
 
-	if cfg.Path != "/custom/app" {
+	if cfg.Path != customAppPath {
 		t.Errorf("Expected path '/custom/app', got '%s'", cfg.Path)
 	}
 }
@@ -93,7 +95,7 @@ func TestConfigValidation(t *testing.T) {
 				ThreadCount:      "300",
 				LoadedClassCount: "5000",
 				HeadRoom:         "5",
-				Path:             "/custom/app",
+				Path:             customAppPath,
 			},
 			expectError: false,
 		},
@@ -245,7 +247,7 @@ func TestInputConvertsValidatedConfig(t *testing.T) {
 		ThreadCount:      "300",
 		LoadedClassCount: "40000",
 		HeadRoom:         "15",
-		Path:             "/custom/app",
+		Path:             customAppPath,
 		JVMClassCount:    "1500",
 		AdjustmentFactor: "125",
 		StaticAdjustment: "-50",
@@ -263,7 +265,7 @@ func TestInputConvertsValidatedConfig(t *testing.T) {
 	if input.LoadedClassCount == nil || *input.LoadedClassCount != 40000 {
 		t.Errorf("LoadedClassCount = %v, want 40000", input.LoadedClassCount)
 	}
-	if input.ThreadCount != 300 || input.HeadRoom != 15 || input.ApplicationPath != "/custom/app" {
+	if input.ThreadCount != 300 || input.HeadRoom != 15 || input.ApplicationPath != customAppPath {
 		t.Errorf("Input = %+v, want converted core values", input)
 	}
 	if input.JVMClassCount != 1500 || input.AdjustmentFactor != 125 || input.StaticAdjustment != -50 {
@@ -276,7 +278,7 @@ func TestInputConvertsValidatedConfig(t *testing.T) {
 
 func TestLoadDeprecatedHeadRoomPrecedence(t *testing.T) {
 	t.Setenv("BPL_JVM_HEADROOM", "10")
-	os.Unsetenv("BPL_JVM_HEAD_ROOM")
+	t.Setenv("BPL_JVM_HEAD_ROOM", "")
 	if got := Load().HeadRoom; got != "10" {
 		t.Errorf("deprecated-only HeadRoom = %q, want 10", got)
 	}
@@ -299,7 +301,7 @@ func TestLoadReadsEveryExternalInput(t *testing.T) {
 		"BPL_JVM_THREAD_COUNT":        "300",
 		"BPL_JVM_LOADED_CLASS_COUNT":  "40000",
 		"BPL_JVM_HEAD_ROOM":           "15",
-		"BPI_APPLICATION_PATH":        "/custom/app",
+		"BPI_APPLICATION_PATH":        customAppPath,
 		"BPI_JVM_CLASS_COUNT":         "1500",
 		"BPI_CLASS_ADJUSTMENT_FACTOR": "125",
 		"BPI_CLASS_STATIC_ADJUSTMENT": "-50",
@@ -310,7 +312,7 @@ func TestLoadReadsEveryExternalInput(t *testing.T) {
 
 	got := Load()
 	if got.TotalMemory != "2G" || got.ThreadCount != "300" || got.LoadedClassCount != "40000" ||
-		got.HeadRoom != "15" || got.Path != "/custom/app" || got.JVMClassCount != "1500" ||
+		got.HeadRoom != "15" || got.Path != customAppPath || got.JVMClassCount != "1500" ||
 		got.AdjustmentFactor != "125" || got.StaticAdjustment != "-50" || got.JavaToolOptions != "-Xss2M" {
 		t.Errorf("Load() = %+v, want all external inputs", got)
 	}
