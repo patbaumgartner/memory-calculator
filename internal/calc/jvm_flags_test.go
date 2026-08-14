@@ -90,6 +90,36 @@ func TestCalculateAppliesEachFlagToItsRegion(t *testing.T) {
 	}
 }
 
+// TestUnparseableFlagIsRejected covers options the calculator recognises but cannot read.
+// Treating them as absent would leave the user's flag in JAVA_TOOL_OPTIONS and append a second,
+// conflicting one, and the JVM honours whichever comes last.
+func TestUnparseableFlagIsRejected(t *testing.T) {
+	flags := []string{
+		"-Xmxbogus",
+		"-Xmx1.5G",
+		"-Xmx-1G",
+		"-Xmx",
+		"-Xss2X",
+		"-XX:MaxMetaspaceSize=lots",
+		"-XX:MaxDirectMemorySize=",
+		"-XX:ReservedCodeCacheSize=1.5G",
+	}
+
+	for _, flag := range flags {
+		t.Run(flag, func(t *testing.T) {
+			c := Calculator{
+				TotalMemory:      Size{Value: 4 * Gibi},
+				ThreadCount:      100,
+				LoadedClassCount: 10000,
+			}
+
+			if _, err := c.Calculate(flag); err == nil {
+				t.Errorf("Calculate(%q) succeeded, want an error", flag)
+			}
+		})
+	}
+}
+
 func TestCalculateHonoursMultipleUserFlags(t *testing.T) {
 	c := Calculator{
 		TotalMemory:      Size{Value: 2 * Gibi},

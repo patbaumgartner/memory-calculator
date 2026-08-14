@@ -61,6 +61,7 @@ check "explicit heap is not duplicated" "1" \
 echo
 echo "Invalid input fails loudly:"
 check_exit "unparseable total memory is fatal" 1 $BINARY --total-memory banana --quiet --path "$FIXTURE"
+check_exit "unparseable heap flag is fatal" 1 env JAVA_TOOL_OPTIONS='-Xmxbogus' $BINARY --total-memory 2G --quiet --path "$FIXTURE"
 check_exit "head room above 99 is fatal" 1 $BINARY --total-memory 2G --head-room 100 --quiet --path "$FIXTURE"
 check_exit "memory too small to satisfy is fatal" 1 $BINARY --total-memory 1M --quiet --path "$FIXTURE"
 check "failures explain themselves on stderr" "total-memory" \

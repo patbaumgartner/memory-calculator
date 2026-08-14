@@ -5,7 +5,6 @@ package calc
 import (
 	"fmt"
 	"math"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -25,15 +24,7 @@ const (
 
 	// Tebi represents one tebibyte (1,099,511,627,776 bytes)
 	Tebi = 1_024 * Gibi
-
-	// SizePattern defines the regular expression pattern for parsing memory size strings.
-	// Supports numeric values followed by optional unit suffixes (k, m, g, t) in both
-	// upper and lower case. Examples: "1024", "512m", "2G", "1.5t"
-	SizePattern = "([\\d]+)([kmgtKMGT]?)"
 )
-
-// SizeRE is the compiled regular expression for parsing memory size strings
-var SizeRE = regexp.MustCompile(fmt.Sprintf("^%s$", SizePattern))
 
 // Provenance indicates the source or origin of a memory size value, providing
 // context for how the value was determined and whether it can be overridden.
@@ -118,37 +109,55 @@ type Size struct {
 // ParseSize parses a memory size in bytes from the given string. Size may include a K, M, G, or T suffix which
 // indicates kibibytes, mebibytes, gibibytes or tebibytes respectively. Sizes that would overflow int64 once the
 // unit multiplier is applied are rejected rather than wrapping around to a negative value.
+//
+// This accepts exactly the grammar HotSpot accepts for memory options: unsigned digits and at most one
+// unit letter. Signs and decimal points are rejected, so anything this parser accepts is a value the JVM
+// will also accept.
 func ParseSize(s string) (Size, error) {
 	t := strings.TrimSpace(s)
 
-	if !SizeRE.MatchString(t) {
-		return Size{}, fmt.Errorf("memory size %q does not match pattern %q", t, SizeRE.String())
+	digits, multiplier := t, int64(1)
+	if len(t) > 0 {
+		switch t[len(t)-1] {
+		case 'k', 'K':
+			digits, multiplier = t[:len(t)-1], Kibi
+		case 'm', 'M':
+			digits, multiplier = t[:len(t)-1], Mebi
+		case 'g', 'G':
+			digits, multiplier = t[:len(t)-1], Gibi
+		case 't', 'T':
+			digits, multiplier = t[:len(t)-1], Tebi
+		}
 	}
 
-	groups := SizeRE.FindStringSubmatch(t)
-	size, err := strconv.ParseInt(groups[1], 10, 64)
+	if !isDigits(digits) {
+		return Size{}, fmt.Errorf("memory size %q must be digits optionally followed by K, M, G, or T", t)
+	}
+
+	size, err := strconv.ParseInt(digits, 10, 64)
 	if err != nil {
-		return Size{}, fmt.Errorf("memory size %q does not fit in a 64-bit integer", groups[1])
+		return Size{}, fmt.Errorf("memory size %q does not fit in a 64-bit integer", t)
 	}
 
-	multiplier := int64(1)
-	switch strings.ToLower(groups[2]) {
-	case "k":
-		multiplier = Kibi
-	case "m":
-		multiplier = Mebi
-	case "g":
-		multiplier = Gibi
-	case "t":
-		multiplier = Tebi
-	}
-
-	// The pattern only matches digits, so size is never negative and this is the only overflow to check.
 	if size > math.MaxInt64/multiplier {
 		return Size{}, fmt.Errorf("memory size %q overflows the maximum supported size of %d bytes", t, int64(math.MaxInt64))
 	}
 
 	return Size{Value: size * multiplier}, nil
+}
+
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+
+	return true
 }
 
 // String renders the size as a JVM memory argument using the largest unit that divides it exactly,
@@ -174,23 +183,4 @@ func (s Size) String() string {
 	}
 
 	return fmt.Sprintf("%dK", b)
-}
-
-// ParseUnit parses a unit string and returns the number of bytes in the given unit. It assumes all units are binary
-// units.
-func ParseUnit(u string) (int64, error) {
-	switch strings.TrimSpace(u) {
-	case "kB", "KB", "KiB":
-		return Kibi, nil
-	case "MB", "MiB":
-		return Mebi, nil
-	case "GB", "GiB":
-		return Gibi, nil
-	case "TB", "TiB":
-		return Tebi, nil
-	case "B", "":
-		return int64(1), nil
-	default:
-		return 0, fmt.Errorf("unrecognized unit %q", u)
-	}
 }
