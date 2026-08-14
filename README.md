@@ -98,8 +98,7 @@ With `--quiet`, only the final options line is printed.
 | `--thread-count` | int | 250 | Threads to reserve stack space for |
 | `--loaded-class-count` | int | counted from `--path` | Classes to size metaspace for |
 | `--head-room` | int | 0 | Percentage of total memory to leave unallocated (0–99) |
-| `--path` | string | `/app` | Directory scanned for JARs to estimate the class count |
-| `--quiet` | bool | false | Print only the JVM options |
+| `--path` | string | `/app` | Directory scanned for JARs to estimate the class count || `--quiet` | bool | false | Print only the JVM options |
 | `--version` | bool | false | Print version information |
 | `--help` | bool | false | Print usage |
 
@@ -184,6 +183,11 @@ walks `--path`, counts entries ending in `.class`, `.classdata`, `.clj`, `.groov
 classes, applies `BPI_CLASS_STATIC_ADJUSTMENT` and `BPI_CLASS_ADJUSTMENT_FACTOR`, and multiplies by a
 0.35 load factor. Nested JAR extraction is capped at 100 MB to bound decompression.
 
+If `--path` is not given and the default `/app` does not exist — the usual case outside a buildpack
+image — the calculator warns and sizes metaspace from `BPI_JVM_CLASS_COUNT` alone rather than
+failing. A path you name explicitly must exist; a typo there is an error, not a warning. Point
+`--path` at the directory holding your JARs to get metaspace sized for your application.
+
 ## Deployment
 
 ### Docker
@@ -191,8 +195,8 @@ classes, applies `BPI_CLASS_STATIC_ADJUSTMENT` and `BPI_CLASS_ADJUSTMENT_FACTOR`
 ```dockerfile
 FROM eclipse-temurin:25-jre-alpine
 COPY --from=patbaumgartner/memory-calculator:alpine /usr/local/bin/memory-calculator /usr/local/bin/
-COPY app.jar /app.jar
-CMD export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)" && exec java -jar /app.jar
+COPY app.jar /app/app.jar
+CMD export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet --path /app)" && exec java -jar /app/app.jar
 ```
 
 Building in a multi-stage image instead:
@@ -205,8 +209,8 @@ RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o memory-calculator ./cmd/memory-ca
 
 FROM eclipse-temurin:25-jre-alpine
 COPY --from=builder /build/memory-calculator /usr/local/bin/
-COPY app.jar /app.jar
-CMD export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)" && exec java -jar /app.jar
+COPY app.jar /app/app.jar
+CMD export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet --path /app)" && exec java -jar /app/app.jar
 ```
 
 ### Kubernetes
@@ -224,7 +228,7 @@ spec:
         memory: "1Gi"
     command: ["/bin/sh", "-c"]
     args:
-    - export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)" && exec java -jar /app.jar
+    - export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)" && exec java -jar /app/app.jar
 ```
 
 More patterns, including shell helpers and troubleshooting, are in [USAGE_GUIDE.md](USAGE_GUIDE.md)
@@ -232,9 +236,15 @@ and [examples/](examples/).
 
 ## Exit codes
 
-`0` on success, `1` on any failure. Failures print a diagnostic to stderr naming the offending
-setting. Invalid configuration, a memory budget too small for the fixed regions, and an unparseable
-JVM option are all failures.
+`0` on success, `1` on any failure, `2` on a usage error such as an unknown flag. Failures print a
+diagnostic to stderr naming the offending setting. Invalid configuration, a memory budget too small
+for the fixed regions, an application path you named that does not exist, and an unparseable JVM
+option are all failures.
+
+Warnings are different from failures: when the memory limit cannot be detected, when it is clamped,
+or when the default application path does not exist, the calculator prints a warning to stderr and
+still emits usable options. Warnings are printed even under `--quiet`, because they mean the options
+are not the ones you asked for.
 
 ## Development
 
@@ -247,7 +257,7 @@ make help        # list all targets
 ./test-local.sh  # build the binary and smoke-test its behaviour
 ```
 
-Total statement coverage is 84.8%. CI runs the suite with the race detector, `golangci-lint`,
+Total statement coverage is 84.2%. CI runs the suite with the race detector, `golangci-lint`,
 `gosec` and `govulncheck` on every push and pull request.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines and

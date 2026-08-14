@@ -190,7 +190,7 @@ in the path of every JVM launch, the supply-chain surface is worth the small amo
 
 ## Testing
 
-- **Unit tests** cover each package; total statement coverage is 84.8%.
+- **Unit tests** cover each package; total statement coverage is 84.2%.
 - **Property sweeps** assert the invariants: regions never exceed the budget, and a rendered size
   never re-parses to more than the value it was rendered from.
 - **Fixture trees** stand in for cgroup filesystems, so v1, v2, hybrid, nested ancestors, every

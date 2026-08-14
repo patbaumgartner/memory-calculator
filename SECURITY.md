@@ -72,10 +72,11 @@ When using the JVM Memory Calculator:
 
 ## Dependencies
 
-We use minimal dependencies and keep them updated:
-- Primary dependency: `github.com/paketo-buildpacks/libjvm`
-- Dependabot automatically creates PRs for dependency updates
-- All dependencies are reviewed for security issues
+The calculator has no third-party dependencies:
+- The module requires only the Go standard library, so `go.sum` is empty
+- This removes transitive-dependency risk entirely; the only supply-chain surface is the Go toolchain
+- Dependabot keeps the GitHub Actions used by CI up to date
+- `govulncheck` runs on every push and pull request to catch vulnerabilities in the standard library
 
 ## Security Features
 
