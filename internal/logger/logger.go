@@ -7,6 +7,10 @@ import (
 )
 
 // Logger provides a simple logging interface to replace bard.Logger
+//
+// Everything is written to stderr, never stdout: --quiet exists so that
+// `$(memory-calculator --quiet)` captures exactly the JVM options, and a diagnostic on stdout
+// would be substituted into JAVA_TOOL_OPTIONS.
 type Logger struct {
 	logger *log.Logger
 	quiet  bool
@@ -46,4 +50,14 @@ func (l *Logger) Debugf(format string, v ...interface{}) {
 	if !l.quiet {
 		l.logger.Printf(format, v...)
 	}
+}
+
+// Warnf reports a condition that changes the result, and is emitted even under --quiet.
+//
+// A warning means the options being printed are not the ones the caller asked for: the memory
+// limit could not be found, it was clamped, or classes could not be counted. Suppressing that
+// under --quiet would hand back a silently mis-sized heap, so only the informational log honors
+// the flag.
+func (l *Logger) Warnf(format string, v ...interface{}) {
+	l.logger.Printf("WARNING: "+format, v...)
 }

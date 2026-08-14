@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -451,5 +452,112 @@ func BenchmarkMainExecution(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Command failed: %v", err)
 		}
+	}
+}
+
+// envWithout returns the process environment with the named variables removed, so a test can
+// exercise a built-in default even when the developer's shell overrides it.
+func envWithout(names ...string) []string {
+	var env []string
+	for _, entry := range os.Environ() {
+		key, _, _ := strings.Cut(entry, "=")
+		if slices.Contains(names, key) {
+			continue
+		}
+		env = append(env, entry)
+	}
+	return env
+}
+
+// TestMissingApplicationPathIsNotFatal locks the behavior of the documented default invocation.
+//
+// `memory-calculator --quiet` with no --path must still print usable options when /app is absent,
+// because callers write JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)" and a non-zero exit there
+// silently yields an unsized JVM rather than an error.
+func TestMissingApplicationPathIsNotFatal(t *testing.T) {
+	if _, err := os.Stat("/app"); err == nil {
+		t.Skip("/app exists on this machine, so the missing-default path cannot be exercised")
+	}
+
+	binaryPath := filepath.Join(t.TempDir(), "memory-calculator")
+	//nolint:gosec // Safe in tests
+	build := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
+	if err := build.Run(); err != nil {
+		t.Fatalf("Failed to build binary: %v", err)
+	}
+
+	//nolint:gosec // Safe in tests
+	cmd := exec.Command(binaryPath, "--total-memory", "2G", "--quiet")
+	cmd.Env = envWithout("BPI_APPLICATION_PATH", "BPL_JVM_LOADED_CLASS_COUNT", "JAVA_TOOL_OPTIONS")
+
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("missing default path must not be fatal, got %v. stderr: %s", err, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "-Xmx") {
+		t.Errorf("expected usable JVM options on stdout, got %q", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "WARNING") {
+		t.Errorf("warnings must not pollute stdout, got %q", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "WARNING") {
+		t.Errorf("expected a warning on stderr explaining the missing path, got %q", stderr.String())
+	}
+}
+
+// TestExplicitMissingApplicationPathIsFatal is the counterpart: a path the caller named is a typo
+// worth failing on, not a default worth degrading.
+func TestExplicitMissingApplicationPathIsFatal(t *testing.T) {
+	binaryPath := filepath.Join(t.TempDir(), "memory-calculator")
+	//nolint:gosec // Safe in tests
+	build := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
+	if err := build.Run(); err != nil {
+		t.Fatalf("Failed to build binary: %v", err)
+	}
+
+	missing := filepath.Join(t.TempDir(), "definitely-absent")
+
+	//nolint:gosec // Safe in tests
+	cmd := exec.Command(binaryPath, "--total-memory", "2G", "--path", missing, "--quiet")
+	cmd.Env = envWithout("BPI_APPLICATION_PATH", "BPL_JVM_LOADED_CLASS_COUNT", "JAVA_TOOL_OPTIONS")
+
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		t.Fatalf("expected a non-zero exit for an explicit missing path, got success: %s", output)
+	}
+	if !strings.Contains(string(output), missing) {
+		t.Errorf("expected the diagnostic to name the offending path, got %q", string(output))
+	}
+}
+
+// TestWarningsSurviveQuietMode guards the contract that --quiet silences the informational log but
+// never a warning: a warning means the emitted options are not the ones the caller asked for.
+func TestWarningsSurviveQuietMode(t *testing.T) {
+	binaryPath := filepath.Join(t.TempDir(), "memory-calculator")
+	//nolint:gosec // Safe in tests
+	build := exec.Command("go", "build", "-o", binaryPath, "./cmd/memory-calculator")
+	if err := build.Run(); err != nil {
+		t.Fatalf("Failed to build binary: %v", err)
+	}
+
+	//nolint:gosec // Safe in tests
+	cmd := exec.Command(binaryPath, "--total-memory", "128T", "--loaded-class-count", "5000", "--path", ".", "--quiet")
+	cmd.Env = envWithout("BPI_APPLICATION_PATH", "BPL_JVM_LOADED_CLASS_COUNT", "JAVA_TOOL_OPTIONS")
+
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("clamping must not be fatal, got %v. stderr: %s", err, stderr.String())
+	}
+
+	if !strings.Contains(stderr.String(), "WARNING") {
+		t.Errorf("expected the clamp warning on stderr under --quiet, got %q", stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "-Xmx") {
+		t.Errorf("expected usable JVM options on stdout, got %q", stdout.String())
 	}
 }
