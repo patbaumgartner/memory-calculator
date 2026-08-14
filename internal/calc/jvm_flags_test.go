@@ -120,6 +120,90 @@ func TestUnparseableFlagIsRejected(t *testing.T) {
 	}
 }
 
+// TestCalculateRejectsInputsThatInflateHeap covers inputs that make a region negative.
+// Region sizes are subtracted from total memory, so a negative one grows the heap past the
+// container limit and yields a plausible -Xmx the container cannot honour.
+func TestCalculateRejectsInputsThatInflateHeap(t *testing.T) {
+	valid := Calculator{
+		TotalMemory:      Size{Value: 2 * Gibi},
+		ThreadCount:      250,
+		LoadedClassCount: 5000,
+		HeadRoom:         0,
+	}
+
+	if _, err := valid.Calculate(""); err != nil {
+		t.Fatalf("baseline Calculate() error = %v", err)
+	}
+
+	tests := []struct {
+		name   string
+		mutate func(*Calculator)
+	}{
+		{"negative head room", func(c *Calculator) { c.HeadRoom = -100 }},
+		{"head room above the maximum", func(c *Calculator) { c.HeadRoom = 100 }},
+		{"negative thread count", func(c *Calculator) { c.ThreadCount = -1000 }},
+		{"negative loaded class count", func(c *Calculator) { c.LoadedClassCount = -100000 }},
+		{"zero total memory", func(c *Calculator) { c.TotalMemory = Size{} }},
+		{"negative total memory", func(c *Calculator) { c.TotalMemory = Size{Value: -Gibi} }},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := valid
+			tt.mutate(&c)
+
+			result, err := c.Calculate("")
+			if err == nil {
+				t.Fatalf("Calculate() succeeded with heap %v, want an error", result.Heap)
+			}
+		})
+	}
+}
+
+// TestCalculateNeverExceedsTotalMemory is the invariant the whole tool rests on: whatever the
+// inputs, the regions it reports must fit inside the memory it was given.
+func TestCalculateNeverExceedsTotalMemory(t *testing.T) {
+	totals := []int64{256 * Mebi, Gibi, 2 * Gibi, 8 * Gibi, 64 * Gibi}
+	threads := []int{0, 1, 50, 250, 1000}
+	classes := []int{0, 1000, 35000, 200000}
+	headRooms := []int{0, 5, 25, 50, 99}
+
+	for _, total := range totals {
+		for _, thread := range threads {
+			for _, class := range classes {
+				for _, headRoom := range headRooms {
+					c := Calculator{
+						TotalMemory:      Size{Value: total},
+						ThreadCount:      thread,
+						LoadedClassCount: class,
+						HeadRoom:         headRoom,
+					}
+
+					result, err := c.Calculate("")
+					if err != nil {
+						continue // Configuration does not fit; Calculate correctly refused it.
+					}
+
+					used, err := result.AllRegionsSize(thread)
+					if err != nil {
+						t.Fatalf("AllRegionsSize() error = %v", err)
+					}
+
+					if used.Value > total {
+						t.Errorf("total=%d threads=%d classes=%d headRoom=%d: allocated %d bytes",
+							total, thread, class, headRoom, used.Value)
+					}
+
+					if result.Heap.Value <= 0 {
+						t.Errorf("total=%d threads=%d classes=%d headRoom=%d: heap %d is not positive",
+							total, thread, class, headRoom, result.Heap.Value)
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestCalculateHonoursMultipleUserFlags(t *testing.T) {
 	c := Calculator{
 		TotalMemory:      Size{Value: 2 * Gibi},

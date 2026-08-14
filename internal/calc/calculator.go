@@ -42,6 +42,10 @@ const (
 	// classloader overhead, and other essential class-related memory structures.
 	// Value: 14,000,000 bytes (approximately 13.35 MB).
 	ClassOverhead = int64(14_000_000)
+
+	// MaxHeadRoom is the largest head room percentage that still leaves memory for the JVM.
+	// Reserving 100% would leave nothing to allocate.
+	MaxHeadRoom = 99
 )
 
 // Calculator represents the core JVM memory calculation engine.
@@ -89,11 +93,11 @@ const (
 //	fmt.Printf("Heap: %s, Metaspace: %s\n", regions.Heap, regions.Metaspace)
 //
 // Validation:
-//   - Total memory must be positive and non-zero
-//   - Thread count must be positive (minimum 1)
-//   - Loaded class count must be positive (minimum 1000)
-//   - Head room must be between 0-99% inclusive
-//   - All memory calculations validated for overflow conditions
+//   - Total memory must be positive
+//   - Thread count must not be negative
+//   - Loaded class count must not be negative
+//   - Head room must be between 0 and MaxHeadRoom percent inclusive
+//   - Sizes parsed from JVM options are rejected if they overflow int64
 type Calculator struct {
 	// HeadRoom specifies the percentage of total memory to reserve as a safety margin.
 	// This memory is not allocated to any JVM component and remains available for
@@ -180,6 +184,10 @@ type Calculator struct {
 //	// Use calculated regions for JVM startup
 //	jvmArgs := regions.ToJVMArgs()
 func (c Calculator) Calculate(flags string) (MemoryRegions, error) {
+	if err := c.validate(); err != nil {
+		return MemoryRegions{}, err
+	}
+
 	// Initialize default memory regions
 	m := MemoryRegions{
 		DirectMemory:      DefaultDirectMemory,
@@ -204,6 +212,32 @@ func (c Calculator) Calculate(flags string) (MemoryRegions, error) {
 	}
 
 	return m, nil
+}
+
+// validate rejects inputs that would produce a negative region.
+//
+// Every region size is subtracted from total memory to size the heap, so a negative count or
+// percentage inflates the heap beyond the container limit instead of shrinking it. That produces a
+// plausible-looking -Xmx that the container cannot honour, so it is rejected here rather than
+// trusted from the caller.
+func (c Calculator) validate() error {
+	if c.TotalMemory.Value <= 0 {
+		return fmt.Errorf("total memory must be positive, got %d bytes", c.TotalMemory.Value)
+	}
+
+	if c.ThreadCount < 0 {
+		return fmt.Errorf("thread count must not be negative, got %d", c.ThreadCount)
+	}
+
+	if c.LoadedClassCount < 0 {
+		return fmt.Errorf("loaded class count must not be negative, got %d", c.LoadedClassCount)
+	}
+
+	if c.HeadRoom < 0 || c.HeadRoom > MaxHeadRoom {
+		return fmt.Errorf("head room must be between 0 and %d percent, got %d", MaxHeadRoom, c.HeadRoom)
+	}
+
+	return nil
 }
 
 // parseAndApplyFlags parses JVM flags and applies them to memory regions
