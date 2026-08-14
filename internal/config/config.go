@@ -5,12 +5,10 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/patbaumgartner/memory-calculator/internal/calc"
 	"github.com/patbaumgartner/memory-calculator/internal/memory"
 	"github.com/patbaumgartner/memory-calculator/pkg/errors"
 )
-
-// MaxHeadRoom is the largest head room percentage that still leaves memory for the JVM itself.
-const MaxHeadRoom = 99
 
 // Config holds all configuration parameters for the memory calculator.
 type Config struct {
@@ -77,7 +75,7 @@ func (c *Config) Validate() error {
 	}
 
 	// Validate head room
-	if headRoom, err := strconv.Atoi(c.HeadRoom); err != nil || headRoom < 0 || headRoom > MaxHeadRoom {
+	if headRoom, err := strconv.Atoi(c.HeadRoom); err != nil || headRoom < 0 || headRoom > calc.MaxHeadRoom {
 		return errors.NewConfigurationError(
 			"head-room", c.HeadRoom, "must be an integer between 0 and 99")
 	}
