@@ -314,8 +314,10 @@ jobs:
 
         # The point of the tool: with no --total-memory it must read the cgroup limit.
         # A heap sized for the host rather than the 512m limit would be far larger.
+        # The thread count is lowered because 250 stacks plus the code cache exceed 512m on
+        # their own, which would fail before the limit could be observed.
         echo "Testing cgroup limit detection:"
-        HEAP=$(docker run --rm --memory=512m "$IMAGE" --loaded-class-count=5000 --path=/tmp --quiet \
+        HEAP=$(docker run --rm --memory=512m "$IMAGE" --loaded-class-count=5000 --thread-count=50 --path=/tmp --quiet \
           | tr ' ' '\n' | grep '^-Xmx')
         echo "detected heap: $HEAP"
         BYTES=$(echo "$HEAP" | sed 's/-Xmx//; s/K$//')
