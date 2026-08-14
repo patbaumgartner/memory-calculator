@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Container memory detection**: cgroup v2 is now read before v1. The shipped code read v1 first,
+  so on a hybrid host it could return a stale v1 limit instead of the limit the container runtime
+  configured.
+- **"No limit" cgroup values**: an unset cgroup v1 limit is the kernel's page-counter maximum, which
+  depends on the page size. The previous check compared against the single literal
+  `9223372036854771712`, so on a 64 KiB-page arm64 kernel the sentinel was read as a real limit and
+  clamped to 64 TiB — a JVM sized for terabytes inside a small container. Values at or above 4 EiB,
+  at or below zero, or too large for `int64` are now all treated as unlimited.
+- **Ancestor cgroup limits**: the detector now walks from the process's own cgroup up to the mount
+  root and uses the smallest limit found. A container cgroup is frequently unlimited while its pod
+  cgroup is capped, and only the walk finds that cap.
+- **Invalid `--total-memory` is fatal**: an unparseable value was a warning, after which the tool
+  fell back to auto-detection and exited 0. In a container that sized the JVM for the host, so a
+  typo produced a confidently wrong heap. `BPL_JVM_TOTAL_MEMORY` was not validated at all.
+- **Errors are no longer silent under `--quiet`**: diagnostics were suppressed entirely, so a failed
+  run exited 1 with no output and `export JAVA_TOOL_OPTIONS="$(memory-calculator --quiet)"` produced
+  an empty variable with no explanation. Errors now always go to stderr; stdout stays clean.
+- **Conflicting `-Xmx`**: a JVM option the tool recognised but could not parse was treated as absent,
+  so `JAVA_TOOL_OPTIONS="-Xmx1.5G"` produced `-Xmx1.5G ... -Xmx3640311K` and the JVM honoured
+  whichever came last. Unreadable option values are now a hard error naming the option.
+- **Size overflow**: `ParseSize` applied the unit multiplier without an overflow check, so `8388608t`
+  wrapped to a negative number and the tool emitted `-Xmx-8388608T`.
+- **Sizes rendering as `0`**: any size below 1 KiB was rendered as `"0"`, producing options such as
+  `-Xmx0` that the JVM rejects.
+- **Negative inputs inflating the heap**: region sizes are subtracted from total memory, so a
+  negative thread count, class count or head room percentage grew the heap beyond the container
+  limit. These are now rejected before any allocation.
+- **JVM option splitting**: a quoted section in the middle of a word split it in two, so
+  `-D"foo"=bar` parsed as `["-Dfoo", "=bar"]`. Unterminated quotes and dangling escapes were silently
+  accepted and mis-split; both are now rejected.
+- **`Total Memory: Unknown`**: the report always printed `Unknown`, because the total was never
+  passed to the formatter. It now reports the budget actually used, along with the resolved class
+  count.
+- **`--version` Go version**: reported a hardcoded string rather than the toolchain that built the
+  binary.
+- **Head room upper bound**: `--head-room=100` was accepted but can never produce a viable
+  configuration. The documented range 0–99 is now enforced.
+
+### Changed
+- **Host memory fallback reads `MemAvailable`** instead of `MemTotal`. Without a cgroup limit the
+  process shares the machine, and sizing a heap against total RAM overcommits a busy host.
+- **Non-Linux host detection removed**: the macOS path multiplied Go's runtime heap statistics by 32
+  and reported the result as physical memory. Unsupported platforms now fall through to the
+  documented 1 GiB default instead of acting on a fabricated number.
+- **`calculator.Execute` returns a typed `Result`** instead of `map[string]string`, carrying the
+  options string, the memory budget, the calculated regions and the effective thread, class and head
+  room values. The display layer no longer re-parses the options string it was handed.
+- **Detection reports its source**, so the log states whether the budget came from cgroup v2, v1,
+  host memory or the default.
+
+### Removed
+- **The `minimal` build variant.** It substituted a different flag parser and replaced JAR class
+  counting with a "one class per 2 KB of file size" guess, so it disagreed with the standard build on
+  real input. Its tests were failing and were never run by CI, yet its binaries shipped in every
+  release. The legacy `memory-calculator-minimal-*` release filenames are still published as copies
+  of the standard binary so existing download URLs keep working; they are deprecated and will be
+  dropped in the next major release. Make targets `build-minimal`, `build-compressed`,
+  `build-size-comparison` and `build-ultimate-comparison` are gone.
+- **Dead packages**: `internal/constants`, and the unreachable duplicates of memory detection. The
+  `internal/cgroups` and `internal/host` packages were imported by nothing outside their own tests
+  while `internal/calculator` carried an inferior copy; the copy is deleted and the packages are now
+  wired in.
+- **`regexp`**: no longer in the dependency graph. The five near-identical per-region option files
+  collapsed into one table of prefixes, shrinking the stripped binary from 2412 KB to 2140 KB
+  (-11.3%), a larger saving than the removed `minimal` variant claimed.
+- **`calc.ParseUnit`**, unused since it was written.
+
+### Security
+- Sizes are checked for 64-bit overflow before the unit multiplier is applied, so a large input
+  cannot wrap into a negative memory budget.
+
 ## [1.3.2] - 2025-12-13
 
 ### Changed

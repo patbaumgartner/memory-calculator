@@ -21,15 +21,12 @@ package calculator
 
 import (
 	"fmt"
-	"os"
-	"strconv"
 	"strings"
 
 	"github.com/patbaumgartner/memory-calculator/internal/calc"
 	"github.com/patbaumgartner/memory-calculator/internal/cgroups"
 	"github.com/patbaumgartner/memory-calculator/internal/count"
 	"github.com/patbaumgartner/memory-calculator/internal/logger"
-	"github.com/patbaumgartner/memory-calculator/internal/memory"
 	"github.com/patbaumgartner/memory-calculator/internal/parser"
 )
 
@@ -60,6 +57,20 @@ func Create(quiet bool) *MemoryCalculator {
 	}
 }
 
+// Input is the typed contract for a memory calculation. Environment variables and command-line
+// flags are external adapters; the calculator itself has no dependency on process-global state.
+type Input struct {
+	TotalMemory      *int64
+	ThreadCount      int
+	LoadedClassCount *int
+	HeadRoom         int
+	ApplicationPath  string
+	JavaToolOptions  string
+	JVMClassCount    int
+	AdjustmentFactor int
+	StaticAdjustment int
+}
+
 // Result is the outcome of a memory calculation.
 type Result struct {
 	// JavaToolOptions is the complete JAVA_TOOL_OPTIONS value, including any options the caller
@@ -82,48 +93,32 @@ func (r Result) Environment() map[string]string {
 	return map[string]string{"JAVA_TOOL_OPTIONS": r.JavaToolOptions}
 }
 
-// Execute performs the memory calculation.
-func (m MemoryCalculator) Execute() (Result, error) {
+// Execute performs the memory calculation from typed input.
+func (m MemoryCalculator) Execute(input Input) (Result, error) {
 	c := calc.Calculator{
-		HeadRoom:    DefaultHeadroom,
-		ThreadCount: DefaultThreadCount,
+		HeadRoom:    input.HeadRoom,
+		ThreadCount: input.ThreadCount,
 	}
 
-	// Parse configuration from environment variables
-	if err := m.parseHeadroomConfig(&c); err != nil {
+	if input.LoadedClassCount != nil {
+		c.LoadedClassCount = *input.LoadedClassCount
+	} else if err := m.calculateClassCount(&c, input); err != nil {
 		return Result{}, err
 	}
 
-	if err := m.parseThreadCountConfig(&c); err != nil {
-		return Result{}, err
-	}
-
-	var values []string
-	opts, ok := os.LookupEnv("JAVA_TOOL_OPTIONS")
-	if ok {
-		values = append(values, opts)
-	}
-
-	// Parse class count configuration
-	if err := m.parseClassCountConfig(&c, opts); err != nil {
-		return Result{}, err
-	}
-
-	// Determine total memory
-	totalMemory, err := m.determineTotalMemory()
-	if err != nil {
-		return Result{}, err
-	}
-
+	totalMemory := m.determineTotalMemory(input.TotalMemory)
 	c.TotalMemory = totalMemory
 
-	r, err := c.Calculate(opts)
+	regions, err := c.Calculate(input.JavaToolOptions)
 	if err != nil {
 		return Result{}, fmt.Errorf("unable to calculate memory configuration\n%w", err)
 	}
 
-	// Build calculated values
-	calculated := m.buildCalculatedValues(r)
+	values := make([]string, 0, 6)
+	if input.JavaToolOptions != "" {
+		values = append(values, input.JavaToolOptions)
+	}
+	calculated := m.buildCalculatedValues(regions)
 	values = append(values, calculated...)
 
 	m.Logger.Infof(
@@ -134,7 +129,7 @@ func (m MemoryCalculator) Execute() (Result, error) {
 	return Result{
 		JavaToolOptions:  strings.Join(values, " "),
 		TotalMemory:      c.TotalMemory,
-		Regions:          r,
+		Regions:          regions,
 		ThreadCount:      c.ThreadCount,
 		LoadedClassCount: c.LoadedClassCount,
 		HeadRoom:         c.HeadRoom,
@@ -152,7 +147,9 @@ func (m MemoryCalculator) CountAgentClasses(opts string) (int, error) {
 	var agentPaths []string
 	for _, s := range p {
 		if strings.HasPrefix(s, "-javaagent:") {
-			agentPaths = append(agentPaths, strings.Split(s, ":")[1])
+			agent := strings.TrimPrefix(s, "-javaagent:")
+			path, _, _ := strings.Cut(agent, "=")
+			agentPaths = append(agentPaths, path)
 		}
 	}
 	if len(agentPaths) > 0 {
@@ -168,135 +165,42 @@ func (m MemoryCalculator) CountAgentClasses(opts string) (int, error) {
 	return agentClassCount, nil
 }
 
-// parseHeadroomConfig parses headroom configuration from environment variables
-func (m MemoryCalculator) parseHeadroomConfig(c *calc.Calculator) error {
-	var deprecatedHeadroom bool
-
-	if s, ok := os.LookupEnv("BPL_JVM_HEADROOM"); ok {
-		headroom, err := strconv.Atoi(s)
-		if err != nil {
-			return fmt.Errorf("unable to convert $BPL_JVM_HEADROOM=%s to integer\n%w", s, err)
-		}
-		c.HeadRoom = headroom
-		deprecatedHeadroom = true
-		m.Logger.Info("WARNING: BPL_JVM_HEADROOM is deprecated and will be removed, please switch to BPL_JVM_HEAD_ROOM")
-	}
-
-	if s, ok := os.LookupEnv("BPL_JVM_HEAD_ROOM"); ok {
-		headroom, err := strconv.Atoi(s)
-		if err != nil {
-			return fmt.Errorf("unable to convert $BPL_JVM_HEAD_ROOM=%s to integer\n%w", s, err)
-		}
-		c.HeadRoom = headroom
-		if deprecatedHeadroom {
-			m.Logger.Info(
-				"WARNING: You have set both BPL_JVM_HEAD_ROOM and BPL_JVM_HEADROOM. " +
-					"BPL_JVM_HEADROOM has been deprecated, so it will be ignored.")
-		}
-	}
-
-	return nil
-}
-
-// parseThreadCountConfig parses thread count configuration from environment variables
-func (m MemoryCalculator) parseThreadCountConfig(c *calc.Calculator) error {
-	if threadCount, ok := os.LookupEnv("BPL_JVM_THREAD_COUNT"); ok {
-		count, err := strconv.Atoi(threadCount)
-		if err != nil {
-			return fmt.Errorf("unable to convert $BPL_JVM_THREAD_COUNT=%s to integer\n%w", threadCount, err)
-		}
-		c.ThreadCount = count
-	}
-	return nil
-}
-
-// parseClassCountConfig parses class count configuration from environment variables
-func (m MemoryCalculator) parseClassCountConfig(c *calc.Calculator, opts string) error {
-	if s, ok := os.LookupEnv("BPL_JVM_LOADED_CLASS_COUNT"); ok {
-		count, err := strconv.Atoi(s)
-		if err != nil {
-			return fmt.Errorf("unable to convert $BPL_JVM_LOADED_CLASS_COUNT=%s to integer\n%w", s, err)
-		}
-		c.LoadedClassCount = count
-		return nil
-	}
-
-	// Calculate class count dynamically
-	appPath := "/app" // Default application path
-	if path, ok := os.LookupEnv("BPI_APPLICATION_PATH"); ok {
-		appPath = path
-	}
-
-	jvmClassCount := 1000 // Default JVM class count
-	if jvmCountStr, ok := os.LookupEnv("BPI_JVM_CLASS_COUNT"); ok {
-		count, err := strconv.Atoi(jvmCountStr)
-		if err != nil {
-			return fmt.Errorf("unable to convert $BPI_JVM_CLASS_COUNT=%s to integer\n%w", jvmCountStr, err)
-		}
-		jvmClassCount = count
-	}
-
-	adjustmentFactor := 100
-	if adjustmentStr, ok := os.LookupEnv("BPI_CLASS_ADJUSTMENT_FACTOR"); ok {
-		factor, err := strconv.Atoi(adjustmentStr)
-		if err != nil {
-			return fmt.Errorf("unable to convert $BPI_CLASS_ADJUSTMENT_FACTOR=%s to integer\n%w", adjustmentStr, err)
-		}
-		adjustmentFactor = factor
-	}
-
-	staticAdjustment := 0
-	if staticStr, ok := os.LookupEnv("BPI_CLASS_STATIC_ADJUSTMENT"); ok {
-		adjustment, err := strconv.Atoi(staticStr)
-		if err != nil {
-			return fmt.Errorf("unable to convert $BPI_CLASS_STATIC_ADJUSTMENT=%s to integer\n%w", staticStr, err)
-		}
-		staticAdjustment = adjustment
-	}
-
-	agentClassCount, err := m.CountAgentClasses(opts)
+// calculateClassCount determines the effective loaded class count from application and agent JARs.
+func (m MemoryCalculator) calculateClassCount(c *calc.Calculator, input Input) error {
+	agentClassCount, err := m.CountAgentClasses(input.JavaToolOptions)
 	if err != nil {
 		return fmt.Errorf("unable to determine agent class count\n%w", err)
 	}
 
-	appClassCount, err := count.Classes(appPath)
+	appClassCount, err := count.Classes(input.ApplicationPath)
 	if err != nil {
 		return fmt.Errorf("unable to determine class count\n%w", err)
 	}
 
-	totalClasses := float64(jvmClassCount+appClassCount+agentClassCount+staticAdjustment) *
-		(float64(adjustmentFactor) / 100.0)
+	totalClasses := float64(input.JVMClassCount+appClassCount+agentClassCount+input.StaticAdjustment) *
+		(float64(input.AdjustmentFactor) / 100.0)
 
 	m.Logger.Debugf(
 		"Memory Calculation: (%d%% * (%d + %d + %d + %d)) * %0.2f",
-		adjustmentFactor, jvmClassCount, appClassCount, agentClassCount, staticAdjustment, ClassLoadFactor)
+		input.AdjustmentFactor, input.JVMClassCount, appClassCount, agentClassCount,
+		input.StaticAdjustment, ClassLoadFactor)
 
 	c.LoadedClassCount = int(totalClasses * ClassLoadFactor)
 	return nil
 }
 
-// determineTotalMemory determines the total memory available to the JVM.
-//
-// An explicit BPL_JVM_TOTAL_MEMORY wins; otherwise the applicable cgroup limit is used, falling
-// back to host memory and finally to a documented default. An unusable explicit value is an error
-// rather than a warning, because silently detecting memory instead would size the JVM for the host
-// and the container would later be killed.
-func (m MemoryCalculator) determineTotalMemory() (calc.Size, error) {
-	if totalMemStr, ok := os.LookupEnv("BPL_JVM_TOTAL_MEMORY"); ok {
-		size, err := memory.CreateParser().ParseMemoryString(totalMemStr)
-		if err != nil {
-			return calc.Size{}, fmt.Errorf("unable to parse $BPL_JVM_TOTAL_MEMORY=%s\n%w", totalMemStr, err)
-		}
-
-		m.Logger.Infof("Using specified memory: %s", calc.Size{Value: size})
-		return m.clamp(size), nil
+// determineTotalMemory uses an explicit memory budget or detects one from cgroups and host memory.
+func (m MemoryCalculator) determineTotalMemory(explicit *int64) calc.Size {
+	if explicit != nil {
+		m.Logger.Infof("Using specified memory: %s", calc.Size{Value: *explicit})
+		return m.clamp(*explicit)
 	}
 
 	detection := m.Detector.Detect()
 	if !detection.Found() {
 		m.Logger.Infof("WARNING: Unable to determine memory limit. Configuring JVM for %s container.",
 			calc.Size{Value: DefaultTotalMemory})
-		return calc.Size{Value: DefaultTotalMemory}, nil
+		return calc.Size{Value: DefaultTotalMemory}
 	}
 
 	m.Logger.Infof("Calculating JVM memory based on %s available memory (source: %s)",
@@ -305,7 +209,7 @@ func (m MemoryCalculator) determineTotalMemory() (calc.Size, error) {
 		"For more information on this calculation, see " +
 			"https://paketo.io/docs/reference/java-reference/#memory-calculator")
 
-	return m.clamp(detection.Limit), nil
+	return m.clamp(detection.Limit)
 }
 
 // clamp caps the total at the largest heap the JVM can address.

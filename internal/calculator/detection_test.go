@@ -96,13 +96,15 @@ func TestExecuteSizesHeapFromDetectedLimit(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "5000")
-			t.Setenv("BPL_JVM_THREAD_COUNT", "50")
-			t.Setenv("BPL_JVM_HEAD_ROOM", "0")
-			os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
-			os.Unsetenv("JAVA_TOOL_OPTIONS")
+			input := Input{
+				ThreadCount:      50,
+				LoadedClassCount: intPtr(5000),
+				ApplicationPath:  t.TempDir(),
+				JVMClassCount:    1000,
+				AdjustmentFactor: 100,
+			}
 
-			result, err := calculatorAt(t, tt.files).Execute()
+			result, err := calculatorAt(t, tt.files).Execute(input)
 			if err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}
@@ -126,18 +128,20 @@ func TestExecuteIgnoresUnlimitedCgroupValues(t *testing.T) {
 
 	for _, sentinel := range sentinels {
 		t.Run(sentinel, func(t *testing.T) {
-			t.Setenv("BPL_JVM_LOADED_CLASS_COUNT", "5000")
-			t.Setenv("BPL_JVM_THREAD_COUNT", "50")
-			t.Setenv("BPL_JVM_HEAD_ROOM", "0")
-			os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
-			os.Unsetenv("JAVA_TOOL_OPTIONS")
+			input := Input{
+				ThreadCount:      50,
+				LoadedClassCount: intPtr(5000),
+				ApplicationPath:  t.TempDir(),
+				JVMClassCount:    1000,
+				AdjustmentFactor: 100,
+			}
 
 			files := map[string]string{
 				"v1/memory.limit_in_bytes": sentinel + "\n",
 				"meminfo":                  "MemAvailable: 524288 kB\n",
 			}
 
-			result, err := calculatorAt(t, files).Execute()
+			result, err := calculatorAt(t, files).Execute(input)
 			if err != nil {
 				t.Fatalf("Execute() error = %v", err)
 			}

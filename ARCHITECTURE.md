@@ -1,857 +1,218 @@
-# JVM Memory Calculator - Architecture Documentation
+# Architecture
 
-System design and component architecture for optimal JVM memory calculation in containerized environments.
+How the JVM Memory Calculator is put together, and why.
 
-## 📚 Table of Contents
+## Table of contents
 
-- [🏗️ System Overview](#️-system-overview)
-- [🧩 Component Architecture](#-component-architecture)
-- [🔄 Data Flow](#-data-flow)
-- [📦 Package Design](#-package-design)
-- [🎯 Design Principles](#-design-principles)
+- [The problem](#the-problem)
+- [Flow](#flow)
+- [Packages](#packages)
+- [The calculation](#the-calculation)
+- [Detecting the memory limit](#detecting-the-memory-limit)
+- [Counting classes](#counting-classes)
+- [Design decisions](#design-decisions)
+- [Testing](#testing)
+- [Security](#security)
 
-## 🏗️ System Overview
+## The problem
 
-The JVM Memory Calculator implements a **layered architecture** with clear separation of concerns, supporting multiple build variants and deployment scenarios. The system is designed for high performance, reliability, and maintainability in containerized environments.
+A JVM sizes itself from what it believes the machine has. Inside a container that belief is wrong
+unless something tells it otherwise: the JVM may see the host's memory while the kernel enforces a
+much smaller cgroup limit. The gap between those two numbers is where OOM kills happen.
 
-### High-Level Architecture
+This tool closes the gap. It determines the memory budget actually in force, divides it across the
+JVM's memory regions, and emits the corresponding options for `JAVA_TOOL_OPTIONS`.
+
+Two properties matter more than anything else:
+
+1. **The budget must be the real one.** Reading the host's memory when a cgroup limit applies, or
+   reading a "no limit" sentinel as a literal number, produces a confidently wrong configuration.
+2. **The regions must fit the budget.** The sum of every region must never exceed total memory. This
+   is asserted directly by a test that sweeps combinations of inputs.
+
+Where the tool cannot be sure, it fails loudly. A wrong answer here is discovered in production, at
+which point the process is already dead; an error at startup is discovered immediately.
+
+## Flow
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                   CLI Layer                                      │
-│                   (cmd/memory-calculator)                        │
-│  ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────────┐ │
-│  │   Argument      │ │    Version      │ │      Help           │ │
-│  │   Parsing       │ │    Display      │ │    Display          │ │
-│  └─────────────────┘ └─────────────────┘ └─────────────────────┘ │
-└─────────────────────────┬────────────────────────────────────────┘
-                          │
-┌─────────────────────────▼────────────────────────────────────────┐
-│                   Application Layer                              │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│  │   Config    │ │   Display   │ │   Logger    │ │   Errors    │ │
-│  │ Management  │ │ Formatting  │ │  Utilities  │ │  Handling   │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
-└─────────────────────────┬────────────────────────────────────────┘
-                          │
-┌─────────────────────────▼────────────────────────────────────────┐
-│                   Business Logic Layer                           │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│  │ Calculator  │ │    Calc     │ │    Count    │ │   Memory    │ │
-│  │Orchestration│ │ Algorithms  │ │ Estimation  │ │  Utilities  │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
-└─────────────────────────┬────────────────────────────────────────┘
-                          │
-┌─────────────────────────▼────────────────────────────────────────┐
-│                   Infrastructure Layer                           │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│  │   CGroups   │ │    Host     │ │   Parser    │ │ Constants   │ │
-│  │  Detection  │ │  Detection  │ │  Utilities  │ │ & Defaults  │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
-└──────────────────────────────────────────────────────────────────┘
+                    ┌──────────────────────┐
+   flags + env ───► │  internal/config     │  parse, apply defaults, validate
+                    └──────────┬───────────┘
+                               │ Config
+                    ┌──────────▼───────────┐
+                    │ internal/calculator  │  orchestration
+                    └──────────┬───────────┘
+                               │
+              ┌────────────────┼────────────────┐
+              ▼                ▼                ▼
+     ┌────────────────┐ ┌────────────┐ ┌────────────────┐
+     │internal/cgroups│ │internal/   │ │internal/parser │
+     │  + host        │ │  count     │ │                │
+     │ memory budget  │ │class count │ │ split existing │
+     │                │ │            │ │ JVM options    │
+     └────────┬───────┘ └─────┬──────┘ └───────┬────────┘
+              └───────────────┼────────────────┘
+                              ▼
+                    ┌──────────────────────┐
+                    │   internal/calc      │  divide the budget
+                    └──────────┬───────────┘
+                               │ Result
+                    ┌──────────▼───────────┐
+                    │  internal/display    │  render
+                    └──────────────────────┘
 ```
 
-### System Characteristics
-
-| Characteristic | Value | Description |
-|----------------|-------|-------------|
-| **Architecture** | Layered + Modular | Clean separation with dependency injection |
-| **Build Variants** | 2 (Standard + Minimal) | Conditional compilation for optimization |
-| **Memory Safety** | Go Runtime + Validation | No unsafe operations, comprehensive bounds checking |
-| **Performance** | < 1ms execution | Optimized algorithms with minimal allocations |
-| **Binary Size** | 2.2-2.4MB | Size-optimized with build constraints |
-| **Platform Support** | Linux + macOS | Cross-platform with platform-specific optimizations |
-| **Container Support** | cgroups v1/v2 | Full container orchestration compatibility |
-
-## 🧩 Component Architecture
-
-### Layer 1: CLI Interface (`cmd/memory-calculator`)
-
-**Purpose**: Command-line interface and application entry point
-**Responsibilities**:
-- Command-line argument parsing and validation
-- Application lifecycle management and graceful shutdown
-- Integration coordination between all internal packages
-- Exit code management and error reporting to shell
-
-**Key Components**:
-```go
-// Main application orchestration
-func main() {
-    cfg := config.Load()
-    formatter := display.CreateFormatter()
-    
-    // Handle special operations
-    if cfg.Version { formatter.DisplayVersion(cfg); return }
-    if cfg.Help { formatter.DisplayHelp(cfg); return }
-    
-    // Execute calculation
-    mc := calculator.Create(cfg.Quiet)
-    result, err := mc.Execute()
-    if err != nil { handleError(cfg.Quiet, "Calculation failed", err) }
-    
-    // Display results
-    displayResults(formatter, result, cfg)
-}
-```
-
-### Layer 2: Application Layer
-
-#### Configuration Management (`internal/config`)
-
-**Purpose**: Centralized configuration handling with comprehensive validation
-**Architecture Pattern**: Factory + Validator
-
-```go
-type Config struct {
-    // Memory configuration
-    TotalMemory      string  // Memory specification
-    ThreadCount      string  // Thread configuration
-    LoadedClassCount string  // Class count settings
-    HeadRoom         string  // Safety margin percentage
-    
-    // Behavior configuration
-    Quiet   bool  // Output mode control
-    Version bool  // Version display flag
-    Help    bool  // Help display flag
-    
-    // Build-time injection
-    BuildVersion string  // Git tag or "dev"
-    BuildTime    string  // Build timestamp
-    CommitHash   string  // Git commit hash
-}
-
-// Factory pattern for configuration creation
-func Load() *Config
-
-// Comprehensive validation with detailed error reporting
-func (c *Config) Validate() error
-
-// Buildpack environment variable integration
-func (c *Config) SetEnvironmentVariables()
-```
-
-#### Display Formatting (`internal/display`)
-
-**Purpose**: Output formatting and presentation layer
-**Architecture Pattern**: Strategy + Template
-
-```go
-type Formatter struct {
-    parser *parser.Parser  // Dependency injection
-}
-
-// Strategy pattern for different output modes
-func (f *Formatter) DisplayResults(props map[string]string, totalMemory int64, cfg *config.Config)
-func (f *Formatter) DisplayQuietResults(props map[string]string)
-func (f *Formatter) DisplayVersion(cfg *config.Config)
-func (f *Formatter) DisplayHelp(cfg *config.Config)
-```
-
-#### Logging (`internal/logger`)
-
-**Purpose**: Structured logging with level control
-**Architecture Pattern**: Singleton + Level-based filtering
-
-```go
-type Logger struct {
-    quiet bool  // Controls output verbosity
-}
-
-func Create(quiet bool) *Logger
-func (l *Logger) Info(message string)
-func (l *Logger) Infof(format string, args ...interface{})
-func (l *Logger) Debug(message string)
-func (l *Logger) Debugf(format string, args ...interface{})
-```
-
-#### Error Handling (`pkg/errors`)
-
-**Purpose**: Structured error management with rich context
-**Architecture Pattern**: Factory + Context Preservation
-
-```go
-type MemoryCalculatorError struct {
-    Type    ErrorType  // Categorical error classification
-    Message string     // Human-readable description
-    Context Context    // Structured context information
-    Cause   error      // Original error chain preservation
-}
-
-type Context struct {
-    Component string                 // Component where error occurred
-    Operation string                 // Operation being performed
-    Details   map[string]interface{} // Additional context data
-}
-```
-
-### Layer 3: Business Logic Layer
-
-#### Calculator Orchestration (`internal/calculator`)
-
-**Purpose**: High-level calculation orchestration and integration
-**Architecture Pattern**: Facade + Template Method
-
-```go
-type MemoryCalculator struct {
-    Logger            *logger.Logger  // Dependency injection
-    MemoryLimitPathV1 string         // cgroups v1 path
-    MemoryLimitPathV2 string         // cgroups v2 path  
-    MemoryInfoPath    string         // /proc/meminfo path
-}
-
-// Template method pattern for calculation flow
-func (m MemoryCalculator) Execute() (map[string]string, error) {
-    // 1. Initialize calculator with defaults
-    // 2. Parse configuration from environment
-    // 3. Detect total memory (container -> host -> default)
-    // 4. Execute core calculation
-    // 5. Build JVM arguments
-    // 6. Return formatted results
-}
-```
-
-#### Core Calculation (`internal/calc`)
-
-**Purpose**: Core memory allocation algorithms with build variant support
-**Architecture Pattern**: Strategy + Build Constraints
-
-```go
-// Build constraint architecture
-//go:build !minimal
-func matchHeap(s string) bool {
-    return HeapPattern.MatchString(s)  // Regex-based parsing
-}
-
-//go:build minimal
-func matchHeap(s string) bool {
-    return strings.HasPrefix(s, "-Xmx")  // String-based parsing
-}
-
-// Core calculator with sophisticated algorithm
-type Calculator struct {
-    TotalMemory      Size  // Total available memory
-    ThreadCount      int   // Number of application threads
-    LoadedClassCount int   // Expected loaded classes  
-    HeadRoom         int   // Safety margin percentage
-}
-
-// Multi-stage allocation algorithm
-func (c Calculator) Calculate(flags string) (MemoryRegions, error) {
-    // Stage 1: Parse and apply existing JVM flags
-    // Stage 2: Calculate head room reservation
-    // Stage 3: Allocate thread stack memory
-    // Stage 4: Calculate metaspace requirements
-    // Stage 5: Reserve code cache and direct memory
-    // Stage 6: Allocate remaining memory to heap
-    // Stage 7: Validate total allocation constraints
-}
-```
-
-#### Class Count Estimation (`internal/count`)
-
-**Purpose**: JAR analysis and class count estimation with build variants
-**Architecture Pattern**: Strategy + Build Constraints
-
-```go
-//go:build !minimal
-func Classes(path string) (int, error) {
-    // Full ZIP/JAR processing with archive extraction
-    return countClassesFromArchives(path)
-}
-
-//go:build minimal  
-func Classes(path string) (int, error) {
-    // Size-based estimation without ZIP dependency
-    return estimateClassesFromSize(path)
-}
-```
-
-#### Memory Utilities (`internal/memory`)
-
-**Purpose**: Memory size parsing, conversion, and arithmetic
-**Architecture Pattern**: Value Object + Parser
-
-```go
-type Size struct {
-    Value      int64      // Memory size in bytes
-    Provenance Provenance // Source tracking
-}
-
-// Comprehensive parsing with flexible format support
-func ParseSize(s string) (Size, error)
-
-// Human-readable formatting
-func (s Size) String() string
-
-// JVM-compatible formatting
-func (s Size) ToJVMArg() string
-
-// Arithmetic operations with overflow protection
-func (s Size) Add(other Size) Size
-func (s Size) Sub(other Size) Size
-```
-
-### Layer 4: Infrastructure Layer
-
-#### Container Detection (`internal/cgroups`)
-
-**Purpose**: Container memory limit detection from cgroups filesystem
-**Architecture Pattern**: Detector + Fallback Chain
-
-```go
-type Detector struct {
-    MemoryLimitPathV1 string  // cgroups v1 path
-    MemoryLimitPathV2 string  // cgroups v2 path
-}
-
-// Detection with graceful fallback
-func (d *Detector) DetectContainerMemory() (int64, error) {
-    // Priority 1: cgroups v2 detection
-    if mem := d.detectV2Memory(); mem > 0 && mem < unrealisticLimit {
-        return mem, nil
-    }
-    
-    // Priority 2: cgroups v1 detection  
-    if mem := d.detectV1Memory(); mem > 0 && mem < unrealisticLimit {
-        return mem, nil
-    }
-    
-    return 0, errors.NewCgroupsError("no valid cgroups limit found", nil)
-}
-```
-
-#### Host Detection (`internal/host`)
-
-**Purpose**: Host system memory detection for non-containerized environments
-**Architecture Pattern**: Platform Strategy
-
-```go
-type Detector struct {
-    MemoryInfoPath string  // /proc/meminfo path for testing
-}
-
-// Platform-specific detection with fallback
-func (d *Detector) DetectHostMemory() (int64, error) {
-    // Linux: Parse /proc/meminfo
-    if runtime.GOOS == "linux" {
-        return d.parseMemInfo()
-    }
-    
-    // macOS: Heuristic-based detection
-    if runtime.GOOS == "darwin" {
-        return d.detectMacOSMemory()
-    }
-    
-    return 0, errors.NewSystemError("unsupported platform", nil)
-}
-```
-
-## 🔄 Data Flow
-
-### Memory Detection Flow
-
-```mermaid
-graph TD
-    A[Application Start] --> B[Load Configuration]
-    B --> C{Memory Specified?}
-    C -->|Yes| D[Parse Specified Memory]
-    C -->|No| E[Container Detection]
-    
-    E --> F{cgroups v2 Available?}
-    F -->|Yes| G[Read /sys/fs/cgroup/memory.max]
-    F -->|No| H{cgroups v1 Available?}
-    
-    H -->|Yes| I[Read memory.limit_in_bytes]
-    H -->|No| J[Host Detection]
-    
-    G --> K{Realistic Limit?}
-    I --> K
-    J --> L[Parse /proc/meminfo]
-    
-    K -->|Yes| M[Use Detected Memory]
-    K -->|No| N[Use Default 1GB]
-    L --> M
-    D --> M
-    
-    M --> O[Validate Memory]
-    O --> P[Create Calculator]
-```
-
-### Calculation Flow
-
-```mermaid
-graph TD
-    A[Calculator.Calculate] --> B[Parse JVM Flags]
-    B --> C[Initialize Default Regions]
-    C --> D[Apply User Overrides]
-    D --> E[Calculate Head Room]
-    E --> F[Allocate Thread Stacks]
-    F --> G[Calculate Metaspace]
-    G --> H[Reserve Code Cache]
-    H --> I[Reserve Direct Memory]
-    I --> J[Calculate Heap Size]
-    J --> K[Validate Total Allocation]
-    K --> L{Validation Pass?}
-    L -->|Yes| M[Return Memory Regions]
-    L -->|No| N[Return Allocation Error]
-```
-
-### Build Variant Selection Flow
-
-```mermaid
-graph TD
-    A[Build Process] --> B{Build Tags?}
-    B -->|minimal| C[Minimal Build]
-    B -->|default| D[Standard Build]
-    
-    C --> E[String-based Parsing]
-    C --> F[Size-based Class Counting]
-    C --> G[Reduced Dependencies]
-    
-    D --> H[Regex-based Parsing]
-    D --> I[ZIP/JAR Processing]
-    D --> J[Full Feature Set]
-    
-    E --> K[Smaller Binary]
-    F --> K
-    G --> K
-    
-    H --> L[Full Functionality]
-    I --> L
-    J --> L
-    
-    K --> M[Identical Output]
-    L --> M
-```
-
-## 📦 Package Design
-
-### Dependency Graph
+Configuration is read once, at the edge, in `internal/config`. Everything downstream receives typed
+values. `calculator.Execute` returns a `Result` carrying the options string, the budget used, the
+calculated regions and the effective thread, class and head room values, so the display layer reads
+fields rather than re-parsing the string it was just handed.
+
+## Packages
+
+| Package | Responsibility |
+|---------|----------------|
+| `cmd/memory-calculator` | Flag definitions, exit codes, error reporting |
+| `internal/config` | Loads flags and environment variables, applies defaults, validates |
+| `internal/calculator` | Orchestrates detection, counting and calculation |
+| `internal/calc` | The memory algorithm, JVM option grammar, `Size` type |
+| `internal/cgroups` | Finds the memory limit in force |
+| `internal/host` | Reads host memory from `/proc/meminfo` |
+| `internal/count` | Counts classes in JARs and on disk |
+| `internal/parser` | Splits a JVM option string into arguments |
+| `internal/memory` | Parses and formats human-facing sizes |
+| `internal/display` | Renders the report and the quiet output |
+| `internal/logger` | Quiet-aware informational logging to stderr |
+| `pkg/errors` | Structured error types; the only importable package |
+
+Dependencies point inward and form no cycles. `internal/calc` depends only on `internal/parser`;
+nothing in the domain reaches back out to configuration or display.
+
+### Two size grammars, deliberately
+
+There are two size parsers and the split is intentional:
+
+- **`internal/memory`** parses what a *human* writes: `1.5GB`, `512m`, `2147483648`. It accepts
+  decimals and two-letter units. It is used for `--total-memory` and its environment equivalent.
+- **`calc.ParseSize`** parses what the *JVM* accepts inside an option: unsigned digits and at most
+  one unit letter. It rejects decimals and signs, because HotSpot rejects them too.
+
+Merging them would mean either rejecting `1.5GB` on the command line, which is convenient and
+unambiguous, or accepting `-Xmx1.5G`, which the JVM refuses to start with. Each grammar matches the
+contract it serves.
+
+## The calculation
+
+Total memory is divided in a fixed order. Everything except the heap is sized first; the heap
+receives what remains.
 
 ```
-cmd/memory-calculator
-├── internal/calculator (facade)
-│   ├── internal/calc (algorithms)
-│   │   ├── internal/memory (utilities)
-│   │   ├── internal/parser (parsing)
-│   │   └── pkg/errors (error handling)
-│   ├── internal/count (class counting)
-│   │   └── internal/memory
-│   ├── internal/cgroups (container detection)
-│   │   └── pkg/errors
-│   ├── internal/host (host detection)
-│   │   └── pkg/errors
-│   └── internal/logger (logging)
-├── internal/config (configuration)
-│   └── pkg/errors
-├── internal/display (formatting)
-│   ├── internal/config
-│   ├── internal/parser
-│   └── internal/memory
-└── pkg/errors (public error types)
+head room  = total × headRoomPercent / 100
+stacks     = threadCount × stackSize            (default 1 MiB each)
+metaspace  = 14,000,000 + loadedClassCount × 5,800
+code cache = 240 MiB
+direct     = 10 MiB
+heap       = total − (head room + stacks + metaspace + code cache + direct)
 ```
 
-### Package Cohesion Analysis
-
-| Package | Cohesion Type | Coupling Level | Stability |
-|---------|---------------|----------------|-----------|
-| `cmd/memory-calculator` | Procedural | High | Unstable |
-| `internal/calc` | Functional | Low | Stable |
-| `internal/calculator` | Communicational | Medium | Semi-stable |
-| `internal/memory` | Functional | Low | Stable |
-| `internal/cgroups` | Functional | Low | Stable |
-| `internal/host` | Functional | Low | Stable |
-| `internal/config` | Logical | Low | Stable |
-| `internal/display` | Functional | Medium | Semi-stable |
-| `pkg/errors` | Functional | Low | Very Stable |
-
-## 🎯 Design Principles
-
-### 1. Single Responsibility Principle (SRP)
-Each package has a single, well-defined responsibility:
-- `calc`: Memory calculation algorithms only
-- `cgroups`: Container memory detection only  
-- `config`: Configuration management only
-- `display`: Output formatting only
-
-### 2. Open/Closed Principle (OCP)
-Extensions supported without modification:
-- New memory detection methods via interface implementation
-- New output formats via strategy pattern
-- New calculation strategies via configuration
-
-### 3. Dependency Inversion Principle (DIP)
-High-level modules depend on abstractions:
-- Calculator doesn't depend on specific detection methods
-- Display doesn't depend on specific data sources
-- All dependencies injected at creation time
-
-### 4. Interface Segregation Principle (ISP)
-Small, focused interfaces:
-```go
-type MemoryDetector interface {
-    DetectMemory() (int64, error)
-}
-
-type Formatter interface {
-    Format(data interface{}) string
-}
-
-type Validator interface {
-    Validate() error
-}
-```
-
-### 5. Build Constraint Architecture
-
-Strategic use of build constraints for optimization:
-```go
-// Standard build - full features
-//go:build !minimal
-
-// Minimal build - size optimized  
-//go:build minimal
-```
-
-**Benefits:**
-- Single codebase maintains both variants
-- Identical APIs ensure compatibility
-- Conditional compilation eliminates unused code
-- Binary size optimization without functionality loss
-
-## 🏗️ Build System Architecture
-
-### Multi-Variant Build Strategy
-
-```
-Build System
-├── Standard Build (default)
-│   ├── Full regex parsing
-│   ├── Complete ZIP/JAR processing
-│   ├── All dependencies included
-│   └── Binary size: ~2.4MB
-└── Minimal Build (-tags minimal)
-    ├── String-based parsing
-    ├── Size-based estimation
-    ├── Reduced dependencies
-    └── Binary size: ~2.2MB
-```
-
-### Optimization Techniques
-
-The project uses **aggressive optimization flags** and **build constraints** to produce smaller binaries:
-
-1.  **Build Constraints**: Conditional compilation with `//go:build` tags
-    -   *Standard Build*: Full functionality (~2.4MB)
-    -   *Minimal Build*: Size optimized (~2.2MB)
-2.  **Strip Debug Information**: `-ldflags="-s -w"`
-    -   `-s`: Strip symbol table
-    -   `-w`: Strip DWARF debug information
-3.  **Path Trimming**: `-trimpath`
-    -   Removes file system paths for reproducible builds
-4.  **Clean Rebuilds**: `-a`
-    -   Forces rebuilding of all packages for optimal linking
-5.  **UPX Compression** (Optional):
-    -   Can further reduce size to ~1.1MB (~68% reduction)
-    -   Trade-off: Slight startup delay due to decompression
-
-#### Feature Comparison
-
-| Feature | Standard | Minimal |
-|---------|----------|---------|
-| **Flag Parsing** | Full Regex Support | String Prefix Matching |
-| **JAR Processing** | ZIP File Analysis | File Size Estimation |
-| **Dependencies** | Standard Library + Regexp/Zip | Reduced Dependencies |
-| **Binary Size** | ~2.4MB | ~2.2MB |
-
-### Cross-Platform Compilation
-
-```bash
-# Linux builds
-GOOS=linux GOARCH=amd64 go build
-GOOS=linux GOARCH=arm64 go build
-
-# macOS builds  
-GOOS=darwin GOARCH=amd64 go build
-GOOS=darwin GOARCH=arm64 go build
-
-# Windows builds (future)
-GOOS=windows GOARCH=amd64 go build
-```
-
-## 🧪 Testing Architecture
-
-### Testing Strategy
-
-```
-Testing Architecture
-├── Unit Tests (per package)
-│   ├── Pure function testing
-│   ├── Mock dependency injection
-│   ├── Edge case validation
-│   └── Error path coverage
-├── Integration Tests
-│   ├── End-to-end CLI testing
-│   ├── Container environment simulation
-│   ├── Cross-platform validation
-│   └── Buildpack integration
-├── Build Constraint Tests
-│   ├── Standard build validation
-│   ├── Minimal build validation
-│   └── Output compatibility verification
-└── Performance Tests
-    ├── Memory allocation benchmarks
-    ├── Execution time validation
-    └── Binary size verification
-```
-
-### Test Coverage Architecture
-
-| Layer | Coverage Target | Actual Coverage | Status |
-|-------|----------------|-----------------|--------|
-| **Infrastructure** | 90%+ | 94.6% | ✅ Excellent |
-| **Business Logic** | 85%+ | 95.7% | ✅ Excellent |
-| **Application** | 95%+ | 100% | ✅ Complete |
-| **CLI** | 80%+ | 85% | ✅ Good |
-| **Overall** | 85%+ | 77.5% | ✅ Good |
-
-## 📈 Performance Characteristics
-
-### Execution Performance
-
-| Metric | Standard Build | Minimal Build | Improvement |
-|--------|---------------|---------------|-------------|
-| **Execution Time** | < 1ms | < 0.8ms | 20% faster |
-| **Memory Usage** | < 2MB | < 1.5MB | 25% less |
-| **Binary Size** | 2.4MB | 2.2MB | 8% smaller |
-| **Startup Time** | < 10ms | < 8ms | 20% faster |
-
-### Scalability Characteristics
-
-```go
-// Performance scales linearly with configuration size
-func BenchmarkCalculation(b *testing.B) {
-    calculator := calc.Calculator{
-        TotalMemory:      memory.SizeFromString("16G"),
-        ThreadCount:      1000,      // High thread count
-        LoadedClassCount: 100000,    // High class count
-        HeadRoom:         10,
-    }
-    
-    b.ResetTimer()
-    for i := 0; i < b.N; i++ {
-        _, err := calculator.Calculate("")
-        if err != nil {
-            b.Fatal(err)
-        }
-    }
-}
-```
-
-**Results**: O(1) complexity, < 1ms execution time regardless of scale
-
-## 🔒 Security Considerations
-
-### Security Architecture
-
-1. **Input Validation**: All inputs validated and sanitized
-2. **Path Traversal Protection**: Restricted file system access
-3. **Resource Limits**: Memory and computation bounds
-4. **Error Information**: No sensitive data in error messages
-5. **Dependency Security**: Regular vulnerability scanning
-
-### Security Measures
-
-```go
-// Safe file reading with restricted paths
-func (d *Detector) readCgroupFile(path string) ([]byte, error) {
-    // Validate path is within allowed cgroups directories
-    if !strings.HasPrefix(path, "/sys/fs/cgroup/") {
-        return nil, errors.NewSecurityError("invalid cgroups path", path)
-    }
-    
-    // Use controlled file reading
-    return os.ReadFile(path) // #nosec G304 - path validated above
-}
-
-// Input sanitization for memory values
-func ParseSize(input string) (Size, error) {
-    // Sanitize input
-    input = strings.TrimSpace(input)
-    if len(input) > maxInputLength {
-        return Size{}, errors.NewValidationError("input too long")
-    }
-    
-    // Validate against patterns
-    if !isValidMemoryFormat(input) {
-        return Size{}, errors.NewMemoryFormatError("invalid format", input)
-    }
-    
-    // Safe parsing with bounds checking
-    return parseValidatedInput(input)
-}
-```
-
-## 🚀 Deployment Patterns
-
-### Container Integration
-
-```yaml
-# Kubernetes Deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: java-app
-spec:
-  template:
-    spec:
-      initContainers:
-      - name: memory-calculator
-        image: memory-calculator:latest
-        command: ["/memory-calculator", "--quiet"]
-        resources:
-          limits:
-            memory: "4Gi"
-        env:
-        - name: BPL_JVM_THREAD_COUNT
-          value: "300"
-        - name: BPL_JVM_HEAD_ROOM  
-          value: "10"
-        volumeMounts:
-        - name: java-opts
-          mountPath: /shared
-      containers:
-      - name: java-app
-        image: openjdk:17
-        env:
-        - name: JAVA_TOOL_OPTIONS
-          valueFrom:
-            configMapKeyRef:
-              name: java-config
-              key: jvm-options
-```
-
-### Buildpack Integration
-
-```bash
-# Paketo Buildpack Usage
-pack build my-app \
-  --env BPL_JVM_TOTAL_MEMORY=4G \
-  --env BPL_JVM_THREAD_COUNT=300 \
-  --env BPL_JVM_HEAD_ROOM=10
-```
-
-### Docker Multi-Stage Build
-
-```dockerfile
-# Multi-stage build with memory calculator
-FROM golang:1.25-alpine AS calculator-builder
-WORKDIR /src
-COPY . .
-RUN make build-minimal
-
-FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl
-COPY --from=calculator-builder /src/memory-calculator /usr/local/bin/
-COPY app.jar /app/
-
-# Calculate memory settings at runtime
-RUN memory-calculator --quiet > /tmp/java-opts
-
-# Use calculated settings
-ENV JAVA_TOOL_OPTIONS_FILE=/tmp/java-opts
-CMD ["sh", "-c", "java $(cat $JAVA_TOOL_OPTIONS_FILE) -jar /app/app.jar"]
-```
-
-## 🔮 Extension Points
-
-### Adding New Memory Detection Methods
-
-1. **Implement Detector Interface**:
-```go
-type CustomDetector struct {
-    configPath string
-}
-
-func (d *CustomDetector) DetectMemory() (int64, error) {
-    // Custom detection logic
-    return detectedMemory, nil
-}
-```
-
-2. **Integrate into Detection Chain**:
-```go
-func DetectTotalMemory() (memory.Size, error) {
-    detectors := []MemoryDetector{
-        &cgroups.Detector{},
-        &host.Detector{},
-        &CustomDetector{configPath: "/custom/path"},
-    }
-    
-    for _, detector := range detectors {
-        if mem, err := detector.DetectMemory(); err == nil && mem > 0 {
-            return memory.SizeFromBytes(mem), nil
-        }
-    }
-    
-    return defaultMemory(), nil
-}
-```
-
-### Adding New Output Formats
-
-1. **Extend Formatter Interface**:
-```go
-type JSONFormatter struct{}
-
-func (f *JSONFormatter) Format(regions calc.MemoryRegions) (string, error) {
-    return json.MarshalIndent(regions, "", "  ")
-}
-```
-
-2. **Register Format**:
-```go
-formatters := map[string]Formatter{
-    "default": &DefaultFormatter{},
-    "json":    &JSONFormatter{},
-    "yaml":    &YAMLFormatter{},
-}
-```
-
-### Adding New Calculation Strategies
-
-1. **Extend Calculator Configuration**:
-```go
-type Calculator struct {
-    // ... existing fields
-    Strategy CalculationStrategy  // New field
-}
-
-type CalculationStrategy int
-const (
-    StandardStrategy CalculationStrategy = iota
-    ConservativeStrategy
-    AggressiveStrategy
-)
-```
-
-2. **Implement Strategy-Specific Logic**:
-```go
-func (c Calculator) calculateHeap(regions *MemoryRegions) {
-    switch c.Strategy {
-    case ConservativeStrategy:
-        // More conservative heap allocation
-        regions.Heap = c.calculateConservativeHeap()
-    case AggressiveStrategy:
-        // More aggressive heap allocation
-        regions.Heap = c.calculateAggressiveHeap()
-    default:
-        // Standard allocation
-        regions.Heap = c.calculateStandardHeap()
-    }
-}
-```
-
----
-
-This architecture provides a robust foundation for the JVM Memory Calculator while maintaining flexibility for future enhancements, platform support, and optimization requirements. The layered design with clear interfaces and dependency injection enables comprehensive testing, maintainability, and extensibility.
+Any region the caller already set in `JAVA_TOOL_OPTIONS` is marked `UserConfigured` and used as
+given, rather than calculated and re-emitted.
+
+Three checks guard the result: the fixed regions must fit the budget, the non-heap regions must fit
+the budget, and the sum of all regions must fit the budget. Failing any of them is an error carrying
+the breakdown, because a configuration that does not fit cannot be silently trimmed into one that
+does.
+
+Rendered sizes always round **down** to a whole unit, so an emitted maximum can never exceed the
+value that was checked against the budget.
+
+## Detecting the memory limit
+
+In order, stopping at the first that yields a limit:
+
+1. `--total-memory` / `BPL_JVM_TOTAL_MEMORY`
+2. cgroup v2 — `/sys/fs/cgroup/memory.max`
+3. cgroup v1 — `/sys/fs/cgroup/memory/memory.limit_in_bytes`
+4. Host `MemAvailable` from `/proc/meminfo`, Linux only
+5. 1 GiB, with a warning
+
+Three details carry most of the correctness:
+
+**v2 before v1.** On a hybrid host both hierarchies are mounted, but the unified hierarchy is the one
+the container runtime configures. Reading v1 first can return a stale limit.
+
+**Walk the hierarchy.** The process's own cgroup is not necessarily the one that constrains it. A
+container's cgroup is frequently unlimited while its pod cgroup is capped. The detector resolves
+membership from `/proc/self/cgroup` and walks up to the mount root, taking the smallest finite limit.
+Inside a cgroup namespace the container's cgroup is mounted as the root, so the walk collapses to a
+single read and stays correct.
+
+**"No limit" is not a number.** An unset v1 limit is reported as the kernel's page-counter maximum:
+int64 max rounded down to a page boundary, which differs between a 4 KiB and a 64 KiB page kernel.
+Matching one literal misses the other and turns "unlimited" into a 64 TiB budget. Anything at or
+above 4 EiB, at or below zero, or too large for int64 is treated as no limit.
+
+Host memory uses `MemAvailable` rather than `MemTotal`. Without a cgroup limit the process shares the
+machine, and sizing a heap against total RAM overcommits a busy host. Non-Linux platforms report
+nothing rather than guess, so the caller applies the documented default.
+
+## Counting classes
+
+Metaspace scales with loaded classes, so the class count must be estimated when not supplied.
+`internal/count` walks the application path and counts entries ending in `.class`, `.classdata`,
+`.clj`, `.groovy` or `.kts`, both inside JARs and on disk, descending one level into nested JARs.
+
+The count is then adjusted: the JVM's own classes are added (`BPI_JVM_CLASS_COUNT`, default 1000),
+`BPI_CLASS_STATIC_ADJUSTMENT` is applied, the total is scaled by `BPI_CLASS_ADJUSTMENT_FACTOR`, and a
+0.35 load factor accounts for the fraction of shipped classes a process actually loads.
+
+Nested JAR extraction is bounded at 100 MB so a crafted archive cannot exhaust memory.
+
+## Design decisions
+
+**Environment variables are an input format, not an internal transport.** The buildpack contract
+(`BPL_JVM_*`, `BPI_*`) is part of the public interface and is preserved. It is read once in
+`internal/config`; the calculator receives typed values rather than re-reading process state.
+
+**One implementation of the algorithm.** A `minimal` build tag once selected alternative parsing and
+class-counting implementations. They disagreed with the standard ones on real input, were never
+exercised by CI, and shipped in every release. Two implementations of a correctness-critical
+calculation are not worth an 8% binary saving. Removing the last regular expression instead cut 11%
+from the binary with one implementation.
+
+**Failures are loud.** Invalid input, an unusable JVM option, and a budget too small for the fixed
+regions all exit non-zero with a diagnostic on stderr — including under `--quiet`, whose contract is
+a clean *stdout*, not silence. The alternative is `export JAVA_TOOL_OPTIONS="$(...)"` quietly
+producing an empty string.
+
+**No dependencies.** The module has an empty `go.sum`. For a binary that runs at container startup,
+in the path of every JVM launch, the supply-chain surface is worth the small amount of parsing code.
+
+## Testing
+
+- **Unit tests** cover each package; total statement coverage is 84.8%.
+- **Property sweeps** assert the invariants: regions never exceed the budget, and a rendered size
+  never re-parses to more than the value it was rendered from.
+- **Fixture trees** stand in for cgroup filesystems, so v1, v2, hybrid, nested ancestors, every
+  "unlimited" sentinel and malformed files are all tested without a container.
+- **End-to-end tests** in `internal/calculator` assert that a 512 MiB limit yields the same heap
+  whether it arrives via v2, v1, an ancestor cgroup or host memory.
+- **Integration tests** in `integration_test.go` build the real binary and run it as a subprocess.
+- **`test-local.sh`** builds the binary and checks the output contract, user-flag handling and that
+  invalid input fails loudly.
+
+CI runs the suite with the race detector, plus `golangci-lint`, `gosec` and `govulncheck`.
+
+## Security
+
+The tool reads files and writes to stdout; it opens no network connections and executes no
+subprocesses.
+
+- Cgroup and `/proc` paths are fixed constants, configurable only from tests.
+- Nested JAR decompression is capped at 100 MB, bounding decompression-bomb exposure.
+- Sizes are checked for 64-bit overflow before the unit multiplier is applied, so a large input
+  cannot wrap into a negative budget.
+- Untrusted values reach `strconv` and path joins only; nothing is interpolated into a shell.
+- The release Docker image runs as a non-root user.
+
+See [SECURITY.md](SECURITY.md) for how to report a vulnerability.

@@ -92,33 +92,15 @@ func main() {
 		fail(err)
 	}
 
-	// Set environment variables for memory calculator
-	cfg.SetEnvironmentVariables()
-
-	// Set total memory if specified
-	if cfg.TotalMemory != "" {
-		_ = os.Setenv("BPL_JVM_TOTAL_MEMORY", cfg.TotalMemory)
-	}
-
-	// Set required default environment variables if not already set
-	setDefaultEnvironmentVariables()
-
 	// Execute memory calculator
 	mc := calculator.Create(cfg.Quiet)
-	result, err := mc.Execute()
+	result, err := mc.Execute(cfg.Input())
 	if err != nil {
 		fail(errors.NewCalculationError("memory calculation failed", err))
 	}
 
 	// Display results
 	displayResults(formatter, result, cfg)
-}
-
-// setDefaultEnvironmentVariables sets required default environment variables if not already set
-func setDefaultEnvironmentVariables() {
-	if os.Getenv("BPI_JVM_CLASS_COUNT") == "" {
-		_ = os.Setenv("BPI_JVM_CLASS_COUNT", "1000")
-	}
 }
 
 // fail reports an error and exits non-zero.

@@ -238,54 +238,73 @@ func TestConfigValidation(t *testing.T) {
 	}
 }
 
-func TestSetEnvironmentVariables(t *testing.T) {
+func TestInputConvertsValidatedConfig(t *testing.T) {
 	cfg := &Config{
+		TotalMemory:      "2G",
 		ThreadCount:      "300",
 		LoadedClassCount: "40000",
 		HeadRoom:         "15",
 		Path:             "/custom/app",
+		JVMClassCount:    "1500",
+		AdjustmentFactor: "125",
+		StaticAdjustment: "-50",
+		JavaToolOptions:  "-Xss2M",
 	}
 
-	cfg.SetEnvironmentVariables()
-
-	if os.Getenv("BPL_JVM_THREAD_COUNT") != "300" {
-		t.Errorf("Expected BPL_JVM_THREAD_COUNT=300, got %s", os.Getenv("BPL_JVM_THREAD_COUNT"))
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
 	}
 
-	if os.Getenv("BPL_JVM_LOADED_CLASS_COUNT") != "40000" {
-		t.Errorf("Expected BPL_JVM_LOADED_CLASS_COUNT=40000, got %s", os.Getenv("BPL_JVM_LOADED_CLASS_COUNT"))
+	input := cfg.Input()
+	if input.TotalMemory == nil || *input.TotalMemory != 2*1024*1024*1024 {
+		t.Errorf("TotalMemory = %v, want 2G", input.TotalMemory)
 	}
-
-	if os.Getenv("BPL_JVM_HEAD_ROOM") != "15" {
-		t.Errorf("Expected BPL_JVM_HEAD_ROOM=15, got %s", os.Getenv("BPL_JVM_HEAD_ROOM"))
+	if input.LoadedClassCount == nil || *input.LoadedClassCount != 40000 {
+		t.Errorf("LoadedClassCount = %v, want 40000", input.LoadedClassCount)
 	}
-
-	if os.Getenv("BPI_APPLICATION_PATH") != "/custom/app" {
-		t.Errorf("Expected BPI_APPLICATION_PATH=/custom/app, got %s", os.Getenv("BPI_APPLICATION_PATH"))
+	if input.ThreadCount != 300 || input.HeadRoom != 15 || input.ApplicationPath != "/custom/app" {
+		t.Errorf("Input = %+v, want converted core values", input)
 	}
-
-	// Clean up
-	_ = os.Unsetenv("BPL_JVM_THREAD_COUNT")
-	_ = os.Unsetenv("BPL_JVM_LOADED_CLASS_COUNT")
-	_ = os.Unsetenv("BPL_JVM_HEAD_ROOM")
-	_ = os.Unsetenv("BPI_APPLICATION_PATH")
+	if input.JVMClassCount != 1500 || input.AdjustmentFactor != 125 || input.StaticAdjustment != -50 {
+		t.Errorf("Input = %+v, want converted class adjustments", input)
+	}
+	if input.JavaToolOptions != "-Xss2M" {
+		t.Errorf("JavaToolOptions = %q, want -Xss2M", input.JavaToolOptions)
+	}
 }
 
-func TestSetTotalMemory(t *testing.T) {
-	cfg := &Config{}
-
-	// Test with positive memory
-	cfg.SetTotalMemory(2147483648) // 2GB
-	if os.Getenv("BPL_JVM_TOTAL_MEMORY") != "2147483648" {
-		t.Errorf("Expected BPL_JVM_TOTAL_MEMORY=2147483648, got %s", os.Getenv("BPL_JVM_TOTAL_MEMORY"))
+func TestLoadDeprecatedHeadRoomPrecedence(t *testing.T) {
+	t.Setenv("BPL_JVM_HEADROOM", "10")
+	os.Unsetenv("BPL_JVM_HEAD_ROOM")
+	if got := Load().HeadRoom; got != "10" {
+		t.Errorf("deprecated-only HeadRoom = %q, want 10", got)
 	}
 
-	// Clean up
-	_ = os.Unsetenv("BPL_JVM_TOTAL_MEMORY")
+	t.Setenv("BPL_JVM_HEAD_ROOM", "20")
+	if got := Load().HeadRoom; got != "20" {
+		t.Errorf("new HeadRoom = %q, want 20 to override the deprecated value", got)
+	}
+}
 
-	// Test with zero memory (should not set env var)
-	cfg.SetTotalMemory(0)
-	if os.Getenv("BPL_JVM_TOTAL_MEMORY") != "" {
-		t.Errorf("Expected BPL_JVM_TOTAL_MEMORY to be unset, got %s", os.Getenv("BPL_JVM_TOTAL_MEMORY"))
+func TestLoadReadsEveryExternalInput(t *testing.T) {
+	for key, value := range map[string]string{
+		"BPL_JVM_TOTAL_MEMORY":        "2G",
+		"BPL_JVM_THREAD_COUNT":        "300",
+		"BPL_JVM_LOADED_CLASS_COUNT":  "40000",
+		"BPL_JVM_HEAD_ROOM":           "15",
+		"BPI_APPLICATION_PATH":        "/custom/app",
+		"BPI_JVM_CLASS_COUNT":         "1500",
+		"BPI_CLASS_ADJUSTMENT_FACTOR": "125",
+		"BPI_CLASS_STATIC_ADJUSTMENT": "-50",
+		"JAVA_TOOL_OPTIONS":           "-Xss2M",
+	} {
+		t.Setenv(key, value)
+	}
+
+	got := Load()
+	if got.TotalMemory != "2G" || got.ThreadCount != "300" || got.LoadedClassCount != "40000" ||
+		got.HeadRoom != "15" || got.Path != "/custom/app" || got.JVMClassCount != "1500" ||
+		got.AdjustmentFactor != "125" || got.StaticAdjustment != "-50" || got.JavaToolOptions != "-Xss2M" {
+		t.Errorf("Load() = %+v, want all external inputs", got)
 	}
 }
