@@ -93,8 +93,8 @@ func ParseStack(s string) (Stack, error) {
 	return Stack(z), err
 }
 
-// matchFlag recognises an option by prefix alone, so that an option carrying an unusable value is
-// still identified as user-configured. Recognising it only when the whole option parses would let
+// matchFlag recognizes an option by prefix alone, so that an option carrying an unusable value is
+// still identified as user-configured. Recognizing it only when the whole option parses would let
 // the calculator treat a malformed `-Xmx` as absent and append a second, conflicting one.
 func matchFlag(s, prefix string) bool {
 	return strings.HasPrefix(strings.TrimSpace(s), prefix)

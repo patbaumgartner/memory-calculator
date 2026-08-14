@@ -91,9 +91,9 @@ func TestCalculateAppliesEachFlagToItsRegion(t *testing.T) {
 	}
 }
 
-// TestUnparseableFlagIsRejected covers options the calculator recognises but cannot read.
+// TestUnparseableFlagIsRejected covers options the calculator recognizes but cannot read.
 // Treating them as absent would leave the user's flag in JAVA_TOOL_OPTIONS and append a second,
-// conflicting one, and the JVM honours whichever comes last.
+// conflicting one, and the JVM honors whichever comes last.
 func TestUnparseableFlagIsRejected(t *testing.T) {
 	flags := []string{
 		"-Xmxbogus",
@@ -123,7 +123,7 @@ func TestUnparseableFlagIsRejected(t *testing.T) {
 
 // TestCalculateRejectsInputsThatInflateHeap covers inputs that make a region negative.
 // Region sizes are subtracted from total memory, so a negative one grows the heap past the
-// container limit and yields a plausible -Xmx the container cannot honour.
+// container limit and yields a plausible -Xmx the container cannot honor.
 func TestCalculateRejectsInputsThatInflateHeap(t *testing.T) {
 	valid := Calculator{
 		TotalMemory:      Size{Value: 2 * Gibi},

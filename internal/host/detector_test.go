@@ -99,7 +99,7 @@ func TestDetectAvailableMemoryMissingFile(t *testing.T) {
 // physical memory, which is unrelated to how much memory the machine has.
 func TestDetectAvailableMemoryIsLinuxOnly(t *testing.T) {
 	if runtime.GOOS == platformLinux {
-		t.Skip("platform-specific behaviour only observable off Linux")
+		t.Skip("platform-specific behavior only observable off Linux")
 	}
 
 	got := CreateWithPath(writeMemInfo(t, "MemAvailable: 8000000 kB\n")).DetectAvailableMemory()
