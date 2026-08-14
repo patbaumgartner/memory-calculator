@@ -105,13 +105,13 @@ func main() {
 
 	// Execute memory calculator
 	mc := calculator.Create(cfg.Quiet)
-	props, err := mc.Execute()
+	result, err := mc.Execute()
 	if err != nil {
 		fail(errors.NewCalculationError("memory calculation failed", err))
 	}
 
 	// Display results
-	displayResults(formatter, props, cfg)
+	displayResults(formatter, result, cfg)
 }
 
 // setDefaultEnvironmentVariables sets required default environment variables if not already set
@@ -132,10 +132,10 @@ func fail(err error) {
 }
 
 // displayResults displays the calculation results based on quiet flag
-func displayResults(formatter *display.Formatter, props map[string]string, cfg *config.Config) {
+func displayResults(formatter *display.Formatter, result calculator.Result, cfg *config.Config) {
 	if cfg.Quiet {
-		formatter.DisplayQuietResults(props)
+		formatter.DisplayQuietResults(result)
 	} else {
-		formatter.DisplayResults(props, 0, cfg) // Let formatter get memory from props
+		formatter.DisplayResults(result, cfg)
 	}
 }

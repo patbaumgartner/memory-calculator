@@ -3,8 +3,11 @@ package display
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 
+	"github.com/patbaumgartner/memory-calculator/internal/calc"
+	"github.com/patbaumgartner/memory-calculator/internal/calculator"
 	"github.com/patbaumgartner/memory-calculator/internal/config"
 	"github.com/patbaumgartner/memory-calculator/internal/memory"
 )
@@ -22,45 +25,59 @@ func CreateFormatter() *Formatter {
 }
 
 // DisplayResults shows the calculated JVM settings in a formatted way.
-func (f *Formatter) DisplayResults(props map[string]string, totalMemory int64, cfg *config.Config) {
+func (f *Formatter) DisplayResults(result calculator.Result, cfg *config.Config) {
 	fmt.Println("\n" + strings.Repeat("=", 50))
 	fmt.Println("JVM Memory Configuration")
 	fmt.Println(strings.Repeat("=", 50))
 
-	fmt.Printf("Total Memory:     %s\n", f.parser.FormatMemory(totalMemory))
-	fmt.Printf("Thread Count:     %s\n", cfg.ThreadCount)
-
-	// Show loaded classes with helpful message if not set
-	if cfg.LoadedClassCount != "" {
-		fmt.Printf("Loaded Classes:   %s\n", cfg.LoadedClassCount)
-	} else {
-		fmt.Printf("Loaded Classes:   auto-calculated from %s\n", cfg.Path)
-	}
-
-	fmt.Printf("Head Room:        %s%%\n", cfg.HeadRoom)
+	fmt.Printf("Total Memory:     %s\n", f.parser.FormatMemory(result.TotalMemory.Value))
+	fmt.Printf("Thread Count:     %d\n", result.ThreadCount)
+	fmt.Printf("Loaded Classes:   %d\n", result.LoadedClassCount)
+	fmt.Printf("Head Room:        %d%%\n", result.HeadRoom)
 	fmt.Printf("Application Path: %s\n", cfg.Path)
 
 	fmt.Println("\nCalculated JVM Arguments:")
 	fmt.Println(strings.Repeat("-", 30))
 
-	// Extract and display key JVM settings
-	f.displayJVMSetting(props, "-Xmx", "Max Heap Size:         ")
-	f.displayJVMSetting(props, "-Xss", "Thread Stack Size:     ")
-	f.displayJVMSetting(props, "-XX:MaxMetaspaceSize", "Max Metaspace Size:    ")
-	f.displayJVMSetting(props, "-XX:ReservedCodeCacheSize", "Code Cache Size:       ")
-	f.displayJVMSetting(props, "-XX:MaxDirectMemorySize", "Direct Memory Size:    ")
+	regions := result.Regions
+	for _, setting := range []struct{ label, value string }{
+		{"Max Heap Size:         ", sizeString(heapValue(regions))},
+		{"Thread Stack Size:     ", sizeString(regions.Stack.Value)},
+		{"Max Metaspace Size:    ", sizeString(metaspaceValue(regions))},
+		{"Code Cache Size:       ", sizeString(regions.ReservedCodeCache.Value)},
+		{"Direct Memory Size:    ", sizeString(regions.DirectMemory.Value)},
+	} {
+		fmt.Printf("%s%s\n", setting.label, setting.value)
+	}
 
 	fmt.Println("\nComplete JVM Options:")
 	fmt.Println(strings.Repeat("-", 30))
+	fmt.Printf("JAVA_TOOL_OPTIONS=%s\n", result.JavaToolOptions)
+}
 
-	javaToolOptions := f.buildJavaToolOptions(props)
-	fmt.Printf("JAVA_TOOL_OPTIONS=%s\n", javaToolOptions)
+func sizeString(value int64) string {
+	return calc.Size{Value: value}.String()
+}
+
+func heapValue(regions calc.MemoryRegions) int64 {
+	if regions.Heap == nil {
+		return 0
+	}
+
+	return regions.Heap.Value
+}
+
+func metaspaceValue(regions calc.MemoryRegions) int64 {
+	if regions.Metaspace == nil {
+		return 0
+	}
+
+	return regions.Metaspace.Value
 }
 
 // DisplayQuietResults shows only the JVM parameters without formatting.
-func (f *Formatter) DisplayQuietResults(props map[string]string) {
-	javaToolOptions := f.buildJavaToolOptions(props)
-	fmt.Print(javaToolOptions)
+func (f *Formatter) DisplayQuietResults(result calculator.Result) {
+	fmt.Print(result.JavaToolOptions)
 }
 
 // DisplayVersion shows version information.
@@ -69,7 +86,7 @@ func (f *Formatter) DisplayVersion(cfg *config.Config) {
 	fmt.Printf("Version: %s\n", cfg.BuildVersion)
 	fmt.Printf("Build Time: %s\n", cfg.BuildTime)
 	fmt.Printf("Commit: %s\n", cfg.CommitHash)
-	fmt.Printf("Go Version: %s\n", "1.25.5")
+	fmt.Printf("Go Version: %s\n", runtime.Version())
 }
 
 // DisplayHelp shows help information.
@@ -101,60 +118,4 @@ func (f *Formatter) DisplayHelp(cfg *config.Config) {
 	fmt.Println("  memory-calculator --total-memory=512M")
 	fmt.Println("  memory-calculator --path=/my/app --total-memory=2G")
 	fmt.Println("  memory-calculator --quiet --total-memory=2G  # Only output JVM parameters")
-}
-
-// displayJVMSetting extracts and displays a specific JVM setting.
-func (f *Formatter) displayJVMSetting(props map[string]string, flag, label string) {
-	// First check if it exists as an individual key
-	if value, exists := props[flag]; exists {
-		fmt.Printf("%s%s\n", label, value)
-		return
-	}
-
-	// If not found individually, try to extract from JAVA_TOOL_OPTIONS
-	if javaToolOptions, exists := props["JAVA_TOOL_OPTIONS"]; exists {
-		value := f.extractJVMFlag(javaToolOptions, flag)
-		if value != "" {
-			fmt.Printf("%s%s\n", label, value)
-		}
-	}
-}
-
-// extractJVMFlag extracts a specific JVM flag value from a JAVA_TOOL_OPTIONS string.
-func (f *Formatter) extractJVMFlag(javaToolOptions, flag string) string {
-	parts := strings.Fields(javaToolOptions)
-
-	for _, part := range parts {
-		if strings.HasPrefix(part, flag) {
-			// Handle flags like -Xmx512M or -XX:MaxMetaspaceSize=128M
-			if strings.Contains(part, "=") {
-				// Format: -XX:MaxMetaspaceSize=128M
-				if split := strings.SplitN(part, "=", 2); len(split) == 2 {
-					return split[1]
-				}
-			} else {
-				// Format: -Xmx512M
-				return strings.TrimPrefix(part, flag)
-			}
-		}
-	}
-	return ""
-}
-
-// buildJavaToolOptions constructs the JAVA_TOOL_OPTIONS string from properties.
-func (f *Formatter) buildJavaToolOptions(props map[string]string) string {
-	// Display JAVA_TOOL_OPTIONS if it exists
-	if javaToolOptions, exists := props["JAVA_TOOL_OPTIONS"]; exists {
-		return javaToolOptions
-	}
-
-	// If JAVA_TOOL_OPTIONS doesn't exist, build it from individual flags
-	var options []string
-	for flag, value := range props {
-		if flag != "JAVA_TOOL_OPTIONS" {
-			options = append(options, fmt.Sprintf("%s%s", flag, value))
-		}
-	}
-
-	return strings.Join(options, " ")
 }
