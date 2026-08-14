@@ -1,0 +1,14 @@
+# Normalise line endings so contributors on Windows do not rewrite whole files
+# and `gofmt -l` stays meaningful in every checkout.
+* text=auto eol=lf
+
+*.go     text eol=lf
+*.md     text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+*.sh     text eol=lf
+Makefile text eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
