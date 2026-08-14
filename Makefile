@@ -85,11 +85,11 @@ build-all: ## Build binaries for all platforms
 ## Test commands
 test: ## Run all tests
 	@echo "Running tests..."
-	$(GOTEST) -v ./...
+	$(GOTEST) -count=1 -race -timeout=10m -v ./...
 
 integration: ## Run integration tests only
 	@echo "Running integration tests..."
-	$(GOTEST) -v -run "TestMain" .
+	$(GOTEST) -count=1 -race -timeout=10m -v -run "TestMain" .
 
 test-all: test integration ## Run all tests including integration tests
 	@echo "All tests completed"

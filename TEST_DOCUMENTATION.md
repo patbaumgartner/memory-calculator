@@ -6,7 +6,7 @@ The test suite covers every package used by the shipped binary. Current total st
 ## Run it
 
 ```bash
-make test                    # go test -v -race -timeout=10m ./...
+make test                    # go test -count=1 -v -race -timeout=10m ./...
 make integration             # root-package binary integration tests
 make coverage                # coverage.out + per-function report
 ./test-local.sh              # fast behaviour smoke test

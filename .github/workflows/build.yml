@@ -76,7 +76,7 @@ jobs:
     - name: Run security scan
       uses: securego/gosec@9e75c0576c9878035d4221392108d458abe10fc3 # v2.28.0
       with:
-        args: '-no-fail -severity medium -confidence medium ./...'
+        args: '-severity medium -confidence medium ./...'
 
     - name: Check for vulnerabilities
       run: |
@@ -234,8 +234,9 @@ jobs:
         done
         
         if [ ${#missing_files[@]} -gt 0 ]; then
-          echo "Warning: Missing expected files:"
+          echo "Missing expected release files:"
           printf '%s\n' "${missing_files[@]}"
+          exit 1
         fi
         
         # Create checksums
@@ -290,27 +291,20 @@ jobs:
       id: build_time
       run: echo "time=$(date -u '+%Y-%m-%d_%H:%M:%S')" >> $GITHUB_OUTPUT
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-      with:
-        context: .
-        file: Dockerfile
-        target: alpine
-        platforms: linux/amd64,linux/arm64
-        push: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha,scope=docker-build
-        cache-to: type=gha,mode=max,scope=docker-build
-        build-args: |
-          VERSION=${{ github.ref_name }}
-          BUILD_TIME=${{ steps.build_time.outputs.time }}
-          COMMIT_HASH=${{ github.sha }}
+    - name: Build Docker image for tests
+      run: |
+        docker build \
+          --target alpine \
+          --tag memory-calculator:test \
+          --build-arg VERSION=${{ github.ref_name }} \
+          --build-arg BUILD_TIME=${{ steps.build_time.outputs.time }} \
+          --build-arg COMMIT_HASH=${{ github.sha }} \
+          .
 
     - name: Test Docker image
       run: |
         set -euo pipefail
-        IMAGE=${{ secrets.DOCKER_USERNAME }}/memory-calculator:latest
+        IMAGE=memory-calculator:test
 
         echo "Testing --version:"
         docker run --rm "$IMAGE" --version
@@ -337,3 +331,20 @@ jobs:
         fi
 
         echo "Docker image tests completed successfully"
+
+    - name: Build and push multi-platform Docker image
+      uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+      with:
+        context: .
+        file: Dockerfile
+        target: alpine
+        platforms: linux/amd64,linux/arm64
+        push: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha,scope=docker-build
+        cache-to: type=gha,mode=max,scope=docker-build
+        build-args: |
+          VERSION=${{ github.ref_name }}
+          BUILD_TIME=${{ steps.build_time.outputs.time }}
+          COMMIT_HASH=${{ github.sha }}

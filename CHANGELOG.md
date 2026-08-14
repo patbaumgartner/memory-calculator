@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Checked region arithmetic**: thread-stack multiplication, metaspace calculation and aggregate
+  region sums now fail on overflow instead of wrapping into plausible but unsafe heaps. Exact-boundary
+  budgets that leave no heap and zero-valued JVM regions are rejected.
+- **Checked class adjustments**: class-count additions and percentage scaling use exact integer math
+  with overflow checks instead of float conversion.
+- **JAR descriptor accumulation**: each archive is now closed before the directory walk continues,
+  so large classpaths cannot exhaust the process file-descriptor limit.
+- **Deprecated head-room warning**: `BPL_JVM_HEADROOM` now emits the documented stderr warning,
+  including under `--quiet`; `BPL_JVM_HEAD_ROOM` still takes precedence.
 - **Container memory detection**: cgroup v2 is now read before v1. The shipped code read v1 first,
   so on a hybrid host it could return a stale v1 limit instead of the limit the container runtime
   configured.
@@ -47,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configuration. The documented range 0–99 is now enforced.
 
 ### Changed
+- **Release gates fail closed**: medium/high `gosec` findings and missing expected release artifacts
+  now fail CI, and Docker behavior is tested against the exact local image built in the job before
+  the multi-platform image is published.
 - **Host memory fallback reads `MemAvailable`** instead of `MemTotal`. Without a cgroup limit the
   process shares the machine, and sizing a heap against total RAM overcommits a busy host.
 - **Non-Linux host detection removed**: the macOS path multiplied Go's runtime heap statistics by 32
