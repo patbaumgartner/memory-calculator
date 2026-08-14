@@ -3,6 +3,8 @@ package display
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"runtime"
 	"strings"
 
@@ -89,33 +91,45 @@ func (f *Formatter) DisplayVersion(cfg *config.Config) {
 	fmt.Printf("Go Version: %s\n", runtime.Version())
 }
 
-// DisplayHelp shows help information.
+// DisplayHelp shows help information on stdout, for an explicit --help.
 func (f *Formatter) DisplayHelp(cfg *config.Config) {
-	fmt.Println("JVM Memory Calculator")
-	fmt.Println("====================")
-	fmt.Printf("Version: %s\n", cfg.BuildVersion)
-	fmt.Println()
-	fmt.Println("Calculates JVM memory settings based on container memory limits.")
-	fmt.Println("Automatically detects memory from cgroups v1/v2.")
-	fmt.Println()
-	fmt.Println("Usage:")
-	fmt.Println("  memory-calculator [flags]")
-	fmt.Println()
-	fmt.Println("Flags:")
-	fmt.Println("  --total-memory string         Total memory (e.g., 2G, 512M, 1024MB)")
-	fmt.Println("  --thread-count string         JVM thread count (default \"250\")")
-	fmt.Println("  --loaded-class-count string   JVM loaded class count (calculated if not set)")
-	fmt.Println("  --head-room string            JVM head room percentage (default \"0\")")
-	fmt.Println("  --path string                 Application path for JAR scanning (default \"/app\")")
-	fmt.Println("  --quiet                       Only output JVM parameters, no formatting")
-	fmt.Println("  --version                     Show version information")
-	fmt.Println("  --help                        Show this help message")
-	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println("  memory-calculator")
-	fmt.Println("  memory-calculator --thread-count=300 --head-room=10")
-	fmt.Println("  memory-calculator --total-memory=2G")
-	fmt.Println("  memory-calculator --total-memory=512M")
-	fmt.Println("  memory-calculator --path=/my/app --total-memory=2G")
-	fmt.Println("  memory-calculator --quiet --total-memory=2G  # Only output JVM parameters")
+	f.WriteHelp(os.Stdout, cfg)
 }
+
+// WriteHelp renders the help text to w.
+//
+// A usage error must render to stderr rather than stdout: callers capture stdout with
+// `$(memory-calculator --quiet)`, and help text written there would be substituted into
+// JAVA_TOOL_OPTIONS as if it were JVM options.
+func (f *Formatter) WriteHelp(w io.Writer, cfg *config.Config) {
+	_, _ = fmt.Fprintf(w, helpText, cfg.BuildVersion)
+}
+
+const helpText = `JVM Memory Calculator
+====================
+Version: %s
+
+Calculates JVM memory settings based on container memory limits.
+Automatically detects memory from cgroups v1/v2.
+
+Usage:
+  memory-calculator [flags]
+
+Flags:
+  --total-memory string         Total memory (e.g., 2G, 512M, 1024MB)
+  --thread-count string         JVM thread count (default "250")
+  --loaded-class-count string   JVM loaded class count (calculated if not set)
+  --head-room string            JVM head room percentage (default "0")
+  --path string                 Application path for JAR scanning (default "/app")
+  --quiet                       Only output JVM parameters, no formatting
+  --version                     Show version information
+  -h, --help                    Show this help message
+
+Examples:
+  memory-calculator
+  memory-calculator --thread-count=300 --head-room=10
+  memory-calculator --total-memory=2G
+  memory-calculator --total-memory=512M
+  memory-calculator --path=/my/app --total-memory=2G
+  memory-calculator --quiet --total-memory=2G  # Only output JVM parameters
+`

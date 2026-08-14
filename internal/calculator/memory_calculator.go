@@ -20,8 +20,11 @@
 package calculator
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"math"
+	"os"
 	"strings"
 
 	"github.com/patbaumgartner/memory-calculator/internal/calc"
@@ -66,10 +69,14 @@ type Input struct {
 	LoadedClassCount *int
 	HeadRoom         int
 	ApplicationPath  string
-	JavaToolOptions  string
-	JVMClassCount    int
-	AdjustmentFactor int
-	StaticAdjustment int
+	// ApplicationPathExplicit records whether the caller chose ApplicationPath. A path the caller
+	// named and that does not exist is a mistake worth failing on; the built-in default merely
+	// not existing is the normal case outside a buildpack image and must not be fatal.
+	ApplicationPathExplicit bool
+	JavaToolOptions         string
+	JVMClassCount           int
+	AdjustmentFactor        int
+	StaticAdjustment        int
 }
 
 // Result is the outcome of a memory calculation.
@@ -162,8 +169,8 @@ func (m MemoryCalculator) CountAgentClasses(opts string) (int, error) {
 		if err != nil {
 			return 0, fmt.Errorf("error counting agent jar classes \n%w", err)
 		} else if skippedAgents > 0 {
-			m.Logger.Infof(
-				`WARNING: could not count classes from all agent jars (skipped %d), `+
+			m.Logger.Warnf(
+				`could not count classes from all agent jars (skipped %d), `+
 					`class count and metaspace may not be sized correctly`, skippedAgents)
 		}
 	}
@@ -177,9 +184,9 @@ func (m MemoryCalculator) calculateClassCount(c *calc.Calculator, input Input) e
 		return fmt.Errorf("unable to determine agent class count\n%w", err)
 	}
 
-	appClassCount, err := count.Classes(input.ApplicationPath)
+	appClassCount, err := m.countApplicationClasses(input)
 	if err != nil {
-		return fmt.Errorf("unable to determine class count\n%w", err)
+		return err
 	}
 
 	m.Logger.Debugf(
@@ -195,6 +202,32 @@ func (m MemoryCalculator) calculateClassCount(c *calc.Calculator, input Input) e
 	}
 	c.LoadedClassCount = loadedClassCount
 	return nil
+}
+
+// countApplicationClasses counts the classes under the application path.
+//
+// The default path exists inside a buildpack image but not on a developer machine or in a
+// hand-written container, where the jar often sits at /app.jar instead. Failing there would make
+// the documented `memory-calculator --quiet` invocation exit non-zero and hand the caller an empty
+// JAVA_TOOL_OPTIONS, so a missing default degrades to zero application classes and a warning. A
+// path the caller named explicitly is still an error, because that is a typo rather than a default.
+func (m MemoryCalculator) countApplicationClasses(input Input) (int, error) {
+	if _, err := os.Stat(input.ApplicationPath); errors.Is(err, fs.ErrNotExist) {
+		if input.ApplicationPathExplicit {
+			return 0, fmt.Errorf("application path %s does not exist", input.ApplicationPath)
+		}
+
+		m.Logger.Warnf(
+			"Application path %s does not exist. Sizing metaspace without application classes; "+
+				"pass --path to point at the application.", input.ApplicationPath)
+		return 0, nil
+	}
+
+	appClassCount, err := count.Classes(input.ApplicationPath)
+	if err != nil {
+		return 0, fmt.Errorf("unable to determine class count\n%w", err)
+	}
+	return appClassCount, nil
 }
 
 func validateInput(input Input) error {
@@ -272,7 +305,7 @@ func (m MemoryCalculator) determineTotalMemory(explicit *int64) calc.Size {
 
 	detection := m.Detector.Detect()
 	if !detection.Found() {
-		m.Logger.Infof("WARNING: Unable to determine memory limit. Configuring JVM for %s container.",
+		m.Logger.Warnf("Unable to determine memory limit. Configuring JVM for %s container.",
 			calc.Size{Value: DefaultTotalMemory})
 		return calc.Size{Value: DefaultTotalMemory}
 	}
@@ -289,7 +322,7 @@ func (m MemoryCalculator) determineTotalMemory(explicit *int64) calc.Size {
 // clamp caps the total at the largest heap the JVM can address.
 func (m MemoryCalculator) clamp(totalMemory int64) calc.Size {
 	if totalMemory > MaxJVMSize {
-		m.Logger.Infof("WARNING: Memory limit %s is too large. Configuring JVM for %s.",
+		m.Logger.Warnf("Memory limit %s is too large. Configuring JVM for %s.",
 			calc.Size{Value: totalMemory}, calc.Size{Value: MaxJVMSize})
 		return calc.Size{Value: MaxJVMSize}
 	}

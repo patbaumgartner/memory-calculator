@@ -20,12 +20,13 @@
 // The calculator automatically detects available memory using this priority:
 //  1. Container cgroups v2: /sys/fs/cgroup/memory.max
 //  2. Container cgroups v1: /sys/fs/cgroup/memory/memory.limit_in_bytes
-//  3. Host system memory: platform-specific detection
+//  3. Host system memory: MemAvailable from /proc/meminfo, Linux only
+//  4. 1 GiB, with a warning
 //
 // Memory allocation algorithm:
 //  1. Head room reservation (configurable percentage)
 //  2. Thread stacks (threads × 1MB each)
-//  3. Metaspace (loaded classes × 8KB each)
+//  3. Metaspace (14,000,000 bytes + 5,800 bytes per loaded class)
 //  4. Code cache (240MB for JIT compilation)
 //  5. Direct memory (10MB for NIO operations)
 //  6. Heap memory (remaining available memory)
@@ -72,10 +73,19 @@ func main() {
 	flag.BoolVar(&cfg.Quiet, "quiet", false, "Only output JVM parameters, no formatting")
 	flag.BoolVar(&cfg.Version, "version", false, "Show version information")
 	flag.BoolVar(&cfg.Help, "help", false, "Show help")
+	flag.BoolVar(&cfg.Help, "h", false, "Show help")
+
+	formatter := display.CreateFormatter()
+	flag.Usage = func() { formatter.WriteHelp(os.Stderr, cfg) }
 
 	flag.Parse()
 
-	formatter := display.CreateFormatter()
+	// A path the caller named is validated strictly; the built-in default is not.
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "path" {
+			cfg.PathExplicit = true
+		}
+	})
 
 	if cfg.Version {
 		formatter.DisplayVersion(cfg)

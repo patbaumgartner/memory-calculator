@@ -27,6 +27,7 @@ type Config struct {
 	LoadedClassCount string
 	HeadRoom         string
 	Path             string
+	PathExplicit     bool
 	JVMClassCount    string
 	AdjustmentFactor string
 	StaticAdjustment string
@@ -69,6 +70,7 @@ func Load() *Config {
 		LoadedClassCount: os.Getenv("BPL_JVM_LOADED_CLASS_COUNT"),
 		HeadRoom:         headRoom,
 		Path:             getEnvOrDefault("BPI_APPLICATION_PATH", defaultApplicationPath),
+		PathExplicit:     os.Getenv("BPI_APPLICATION_PATH") != "",
 		JVMClassCount:    getEnvOrDefault("BPI_JVM_CLASS_COUNT", defaultJVMClassCount),
 		AdjustmentFactor: getEnvOrDefault("BPI_CLASS_ADJUSTMENT_FACTOR", defaultAdjustment),
 		StaticAdjustment: getEnvOrDefault("BPI_CLASS_STATIC_ADJUSTMENT", defaultStaticAdjustment),
@@ -112,7 +114,8 @@ func (c *Config) Validate() error {
 		return errors.NewConfigurationError("path", c.Path, "application path cannot be empty")
 	}
 
-	if _, err := nonNegativeInteger("BPI_JVM_CLASS_COUNT", valueOrDefault(c.JVMClassCount, defaultJVMClassCount)); err != nil {
+	if _, err := nonNegativeInteger("BPI_JVM_CLASS_COUNT",
+		valueOrDefault(c.JVMClassCount, defaultJVMClassCount)); err != nil {
 		return err
 	}
 	if _, err := nonNegativeInteger("BPI_CLASS_ADJUSTMENT_FACTOR",
@@ -136,13 +139,14 @@ func (c *Config) Input() calculator.Input {
 	staticAdjustment, _ := strconv.Atoi(valueOrDefault(c.StaticAdjustment, defaultStaticAdjustment))
 
 	input := calculator.Input{
-		ThreadCount:      threadCount,
-		HeadRoom:         headRoom,
-		ApplicationPath:  c.Path,
-		JavaToolOptions:  c.JavaToolOptions,
-		JVMClassCount:    jvmClassCount,
-		AdjustmentFactor: adjustmentFactor,
-		StaticAdjustment: staticAdjustment,
+		ThreadCount:             threadCount,
+		HeadRoom:                headRoom,
+		ApplicationPath:         c.Path,
+		ApplicationPathExplicit: c.PathExplicit,
+		JavaToolOptions:         c.JavaToolOptions,
+		JVMClassCount:           jvmClassCount,
+		AdjustmentFactor:        adjustmentFactor,
+		StaticAdjustment:        staticAdjustment,
 	}
 
 	if c.TotalMemory != "" {
