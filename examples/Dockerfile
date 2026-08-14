@@ -5,7 +5,7 @@
 FROM golang:1.25.5-alpine3.21 AS calculator-builder
 WORKDIR /build
 COPY . .
-RUN apk add --no-cache make && make build-minimal
+RUN apk add --no-cache make && make build
 
 # Runtime image
 FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl

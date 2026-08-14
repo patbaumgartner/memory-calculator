@@ -1,415 +1,122 @@
-# JVM Memory Calculator - Test Suite Documentation
+# Test Suite
 
-## Overview
-This document describes the comprehensive test suite for the JVM Memory Calculator, which provides **87.2% code coverage** for core calculation logic with multiple types of tests across a well-structured package architecture. The test suite includes **advanced build constraint testing** for both standard and minimal build variants, ensuring consistent functionality across all deployment scenarios.
+The test suite covers every package used by the shipped binary. Current total statement coverage is
+**84.8%**; CI also runs the suite with the race detector.
 
-## Architecture & Test Organization
+## Run it
 
-The test suite is organized by package structure, providing clear separation of concerns:
+```bash
+make test                    # go test -v -race -timeout=10m ./...
+make integration             # root-package binary integration tests
+make coverage                # coverage.out + per-function report
+./test-local.sh              # fast behaviour smoke test
 
-### Package Structure
-```
-cmd/memory-calculator/          # Main application entry point
-pkg/errors/                     # Public structured error types  
-internal/
-├── calc/                      # Memory calculations with build constraints
-├── calculator/                # Memory calculator
-├── cgroups/                   # Container memory detection
-├── config/                    # Configuration management
-├── constants/                 # Memory unit constants
-├── count/                     # Class counting with build variants
-├── display/                   # Output formatting
-├── host/                      # Host memory detection
-├── logger/                    # Logging utilities
-├── memory/                    # Memory parsing & formatting
-└── parser/                    # Memory string parsing
+go test -count=1 ./...       # bypass the test cache
 ```
 
-### Build Constraint Testing
+`make quality` adds formatting, `golangci-lint`, `gosec` and `govulncheck`.
 
-The test suite includes comprehensive testing for **build constraints** that enable different binary variants:
+## Layers
 
-**Standard Build Tests:**
-- Full regex-based JVM flag parsing
-- Complete ZIP/JAR file processing
-- All original functionality preserved
-- ✅ **Status**: All tests passing
+### Unit tests
 
-**Minimal Build Tests:**
-- Simple string-based parsing validation
-- File size-based class count estimation
-- Functional equivalence verification
-- ✅ **Status**: All tests passing
+Each internal package is tested at its own boundary:
 
-**Cross-Build Tests:**
-- Consistency testing across both build variants
-- Performance benchmarking for different implementations
-- Integration testing for identical output verification
-- ✅ **Status**: Both variants produce identical outputs
-
-**Integration Test Environment:**
-- Enhanced test-local.sh script with proper test directory setup
-- Both build variants tested in isolation
-- Binary size comparison and validation
-- ✅ **Status**: Complete integration test compatibility
-
-## Test Files by Package
-
-### 1. `integration_test.go` (Root Package)
-**End-to-end integration tests**
-- `TestMainIntegration`: Full application testing with various command line arguments
-- `TestMainEnvironmentVariables`: Tests buildpack environment variable handling
-- `TestMainBoundaryValues`: Tests edge cases and boundary conditions
-- `TestMainHostMemoryDetection`: Tests enhanced memory auto-detection with host fallback
-
-### 2. `internal/memory/parser_test.go`
-**Memory parsing and formatting tests** (95.7% coverage)
-- `TestParseMemoryString`: Comprehensive memory string parsing with 25+ test cases
-- `TestFormatMemory`: Memory formatting to human-readable strings with edge cases
-- `TestValidateMemorySize`: Memory size validation testing
-- `TestCreateParser`: Parser constructor testing
-- `TestConstants`: Memory unit constant validation
-
-### 3. `internal/cgroups/detector_test.go`
-**Container memory detection tests** (94.6% coverage)
-- `TestDetectContainerMemory`: Integration tests for memory detection
-- `TestDetectContainerMemoryWithHostFallback`: Tests intelligent fallback to host detection
-- `TestHostFallbackPriority`: Tests prioritized detection (cgroups v2 → v1 → host)
-- `TestReadCgroupsV1`: cgroups v1 memory limit reading with mock files
-- `TestReadCgroupsV2`: cgroups v2 memory limit reading with mock files
-- `TestCreateDetector`: Constructor and dependency injection testing
-
-### 4. `internal/host/detector_test.go`
-**Host memory detection tests** (100% coverage) - NEW
-- `TestDetectHostMemory`: Cross-platform host memory detection
-- `TestDetectLinuxMemory`: Linux `/proc/meminfo` parsing with comprehensive scenarios
-- `TestDetectDarwinMemory`: macOS heuristic-based memory detection  
-- `TestIsHostMemoryDetectionSupported`: Platform support validation
-- `TestPlatformSpecificBehavior`: Tests platform-specific detection logic
-- `TestMemoryDetectionRealWorldScenarios`: Real-world memory size testing
-
-### 5. `internal/display/formatter_test.go`
-**Output and display tests** (100% coverage)
-- `TestDisplayResults`: Main result display function testing
-- `TestDisplayQuietResults`: Quiet mode output testing
-- `TestExtractJVMFlag`: JVM flag extraction and parsing
-- `TestBuildJavaToolOptions`: JAVA_TOOL_OPTIONS construction
-- `TestDisplayJVMSetting`: Individual JVM setting display
-
-### 6. `internal/config/config_test.go`
-**Configuration management tests** (100% coverage)
-- `TestLoad`: Default configuration creation
-- `TestConfigValidate`: Configuration validation with error cases
-- `TestConfigSetEnvironmentVariables`: Environment variable handling
-- `TestConfigSetTotalMemory`: Memory configuration setting
-
-### 7. `pkg/errors/errors_test.go`
-**Error handling tests** (100% coverage)
-- `TestMemoryCalculatorError`: Structured error type testing
-- `TestNewMemoryFormatError`: Memory format error creation
-- `TestNewCgroupsError`: Cgroups error creation
-- `TestNewCalculationError`: Calculation error creation
-- `TestNewConfigurationError`: Configuration error creation
-
-## Test Categories
-
-### Unit Tests (Per Package)
-- **Memory Parsing**: 30+ test cases covering all supported units and edge cases
-- **Memory Formatting**: 15+ test cases covering byte to human-readable conversion  
-- **Container Detection**: Comprehensive cgroups v1/v2 testing with mock file systems
-- **Host Memory Detection**: Cross-platform memory detection with platform-specific testing
-- **Memory Detection Fallback**: Tests prioritized detection (cgroups → host fallback)
-- **Configuration Management**: Environment variables and validation testing
-- **Display Formatting**: Output formatting for both standard and quiet modes
-- **Error Handling**: Structured error types with context and wrapping
-
-### Integration Tests
-- **Command Line Interface**: Tests all command line parameters and combinations
-- **Environment Variables**: Tests for buildpack-compatible environment variable handling
-- **Memory Units**: Tests various memory unit formats (bytes, K, KB, M, MB, G, GB, T, TB)
-- **Parameter Validation**: Tests parameter validation and error handling
-- **End-to-End Workflows**: Complete application testing with realistic scenarios
-
-### Package Coverage Summary
-
-| Package | Coverage | Key Features Tested |
+| Package | Coverage | What is exercised |
 |---------|----------|-------------------|
-| `pkg/errors` | **100.0%** | Structured error types, error wrapping, context |
-| `internal/config` | **100.0%** | Configuration validation, environment variables |
-| `internal/display` | **100.0%** | Output formatting, JVM flag extraction |
-| `internal/memory` | **98.2%** | Memory parsing, formatting, validation |
-| `internal/cgroups` | **95.1%** | Container memory detection, cgroups v1/v2, host fallback |
-| `internal/host` | **79.4%** | Host memory detection, cross-platform support |
-| `cmd/memory-calculator` | **0.0%** | Main function (tested via integration) |
-| **Overall** | **77.1%** | **Enhanced with host detection and improved tooling** |
+| `internal/calc` | 92.1% | allocation, option grammar, overflow, invariants |
+| `internal/calculator` | 85.0% | orchestration, environment inputs, end-to-end results |
+| `internal/cgroups` | 96.6% | v1/v2, hybrid, nested limits, unlimited sentinels |
+| `internal/config` | 100.0% | defaults, validation, environment variables |
+| `internal/count` | 63.0% | files, JARs, nested archives, malformed archives |
+| `internal/display` | 100.0% | reports, quiet output, help and version |
+| `internal/host` | 90.9% | `MemAvailable`, old-kernel fallback, malformed files |
+| `internal/logger` | 100.0% | quiet and non-quiet logging |
+| `internal/memory` | 98.2% | human-facing size grammar and formatting |
+| `internal/parser` | 100.0% | JVM option splitting, quoting and escapes |
+| `pkg/errors` | 100.0% | structured errors and unwrapping |
 
-### Performance Tests (Benchmarks)
-- **Memory Parsing Performance** (`internal/memory`): Benchmarks for different memory unit formats
-- **Memory Formatting Performance** (`internal/memory`): Benchmarks for different memory sizes  
-- **Container Detection Performance** (`internal/cgroups`): Benchmarks for cgroups memory detection
-- **Host Detection Performance** (`internal/host`): Benchmarks for cross-platform host memory detection
-- **Display Performance** (`internal/display`): Benchmarks for output formatting and JVM flag extraction
-- **Main Execution Performance** (`integration`): End-to-end application performance testing
+The root `integration_test.go` and the `cmd` package do not contribute statement coverage, because
+the integration test builds and runs the real binary as a subprocess. Their behaviour is still
+covered.
 
-### Build Constraint Tests
+### Invariant tests
 
-**Advanced Testing for Multiple Build Variants:**
+Examples are not enough for a memory calculator. Two tests sweep values to lock the properties the
+tool depends on:
 
-#### Standard Build Tests
-- Full regex-based JVM flag parsing validation
-- Complete ZIP/JAR file processing functionality
-- Comprehensive error handling for invalid formats
-- Full dependency integration (regexp, archive/zip)
+- `TestCalculateNeverExceedsTotalMemory` varies total memory, threads, classes and head room, and
+  asserts every successful calculation has a positive heap and regions whose sum fits the budget.
+- `TestSizeStringNeverExceedsBudget` asserts an emitted JVM size re-parses to no more than the value
+  it represents, so unit rounding never grows a maximum.
 
-#### Minimal Build Tests  
-- Simple string-based parsing accuracy
-- File size-based class count estimation
-- Streamlined functionality verification
-- Reduced dependency validation
+### Cgroup fixture tests
 
-#### Cross-Build Consistency Tests
-- **Functional Equivalence**: Both builds produce identical results for standard inputs
-- **Performance Comparison**: Benchmarking across build variants
-- **Integration Validation**: End-to-end testing with both binary variants
-- **Error Handling Consistency**: Both builds handle errors appropriately
+Tests create temporary directory trees that look like cgroup filesystems. This is deterministic,
+does not require root or Docker, and covers scenarios that are difficult to arrange on the CI host:
 
-**Test Commands:**
-```bash
-# Test standard build constraint implementations
-go test -v ./internal/calc -run "TestBuildConstraints"
-go test -v ./internal/count -run "TestMinimalBuild"
+- finite cgroup v1 and v2 limits;
+- hybrid systems, with v2 taking precedence;
+- an unlimited leaf constrained by a Kubernetes-style ancestor;
+- the tightest finite limit in a hierarchy;
+- `max`, `-1`, 4 KiB-page and 64 KiB-page v1 sentinels, and unsigned overflow;
+- malformed, empty and missing files;
+- a legitimate limit above 1 TiB;
+- host `MemAvailable` fallback.
 
-# Test minimal build constraint implementations  
-go test -tags minimal -v ./internal/calc -run "TestBuildConstraints"
-go test -tags minimal -v ./internal/count -run "TestMinimalBuild"
-```
+`internal/calculator/detection_test.go` exercises the complete path from those fixture files to the
+emitted `-Xmx`. A 512 MiB limit must produce the same heap whether it is supplied by cgroup v2,
+cgroup v1, an ancestor cgroup or host memory.
 
-## Test Coverage: 77.1% 🎯
+### Binary integration tests
 
-### Fully Covered Areas ✅
-✅ Memory string parsing and validation (98.2%)
-✅ Memory formatting and display (100.0%)  
-✅ Configuration management and validation (100.0%)
-✅ Container memory detection with host fallback (95.1%)
-✅ Error handling with structured types (100.0%)
-✅ Output formatting and display (100.0%)
-✅ Environment variable management (100.0%)  
-✅ Host memory detection across platforms (79.4%)
-✅ Memory detection fallback priority testing
-✅ Integration with Paketo buildpack memory calculator
+`integration_test.go` builds `./cmd/memory-calculator` into a temporary directory and runs it with
+real arguments and environment variables. It verifies:
 
-### Areas with Limited Coverage ⚠️
-⚠️ Main function execution (covered by integration tests)
-⚠️ Some edge cases in cgroups file reading  
-⚠️ Cross-platform system calls (macOS uses heuristics due to CGO-free approach)
-⚠️ Complex platform-specific behavior edge cases
+- help and version output;
+- normal and quiet output;
+- memory units, decimal total memory and explicit settings;
+- invalid values exit non-zero and explain themselves;
+- standard-output decoration does not leak into quiet mode.
 
-## Architecture Benefits
+Use `go test -count=1 -run TestMainIntegration .` to run only this layer.
 
-### Professional Package Structure
-- **Separation of Concerns**: Each package has a single responsibility
-- **Testability**: Packages can be tested independently with dependency injection
-- **Maintainability**: Clear interfaces and structured error handling
-- **Reusability**: Modular components that can be imported by other projects
+### Local smoke test
 
-### Dependency Injection Pattern  
-- Clean main function using dependency-injected components
-- Easy mocking and testing of individual components
-- Improved testability and maintainability
+`./test-local.sh` is the shortest pre-push check. It builds the binary and verifies:
 
-## Running Tests
+- quiet output contains JVM options and no report decoration;
+- verbose output reports the memory budget actually used;
+- a user-supplied `-Xmx` is preserved and not duplicated;
+- invalid total memory, JVM options and head room fail non-zero;
+- errors are visible on stderr even under `--quiet`.
 
-### All Tests with Coverage
-```bash
-make coverage
-```
+## Adding a test
 
-### All Tests (Basic)
-```bash
-make test
-```
+1. Put a unit test beside the package it exercises.
+2. Prefer a table when the behavior has multiple input classes.
+3. For a bug, first encode the exact regression, then add a broader invariant if the root cause
+   represents a family of failures.
+4. Use `t.Setenv` for environment variables; it restores state automatically.
+5. Use `t.TempDir` for filesystem fixtures.
+6. Run `go test -count=1 -race ./...` before committing.
 
-### HTML Coverage Report
-```bash
-make coverage-html
-```
+Do not weaken or delete a failing test to make the suite pass. A test that exposes a real mismatch
+between documentation and behavior is evidence that one of them must be corrected.
 
-### Package-Specific Tests
-```bash
-# Memory parsing tests
-go test ./internal/memory -v
+## CI
 
-# Container detection tests  
-go test ./internal/cgroups -v
+`.github/workflows/build.yml` runs:
 
-# Host memory detection tests
-go test ./internal/host -v
+1. `gofmt` verification;
+2. native and cross-platform builds;
+3. `go test -race` with coverage;
+4. `test-local.sh`;
+5. `golangci-lint`;
+6. `gosec`;
+7. `govulncheck`;
+8. release builds for linux/darwin on amd64/arm64;
+9. Docker image smoke tests, including automatic detection in a 512 MiB container.
 
-# Display formatting tests
-go test ./internal/display -v
-
-# Configuration tests
-go test ./internal/config -v
-
-# Error handling tests
-go test ./pkg/errors -v
-
-# Integration tests only
-go test -run TestMain -v
-```
-
-### Benchmarks
-```bash
-# All benchmarks
-make benchmark
-
-# Benchmark comparison (save results)
-make benchmark-compare
-
-# Package-specific benchmarks  
-go test ./internal/memory -bench=.
-go test ./internal/cgroups -bench=.
-go test ./internal/host -bench=.
-go test ./internal/display -bench=.
-```
-
-### Quality Assurance
-```bash
-# Run comprehensive quality checks (format, lint, security, vulnerabilities)
-make quality
-
-# Individual quality checks
-make format           # Format Go code
-make lint             # Run golangci-lint
-make security         # Run gosec security scan
-make vulncheck        # Run govulncheck vulnerability scan
-
-# Development tools
-make tools            # Install all development tools
-make tools-check      # Verify tools are available
-```
-
-## Test Results Summary
-
-**Total Test Packages**: 7 packages (including new host detection)
-**Total Tests**: 120+ test cases across all packages
-**Overall Coverage**: **77.1%** (improved from 75.2% with host detection)
-**Package Coverage**: 3 packages at 100.0%, 2 packages at 95%+
-**Reliability**: 100% pass rate across all test scenarios
-**Architecture**: Professional package structure with dependency injection
-**Quality Assurance**: Comprehensive linting, security scanning, and vulnerability checks
-
-## Key Test Scenarios Covered
-
-### Memory Input Formats
-- Raw bytes: `2147483648`
-- Kilobytes: `1024K`, `1024KB`
-- Megabytes: `512M`, `512MB`
-- Gigabytes: `2G`, `2GB`
-- Terabytes: `1T`, `1TB`
-- Decimal values: `1.5G`, `2.5M`
-- Case insensitive: `1g`, `512m`
-- Whitespace handling: ` 1G `, `  512M  `
-
-### Error Conditions
-- Invalid formats: `invalid`, `1X`, `G1`
-- Empty inputs: `""`
-- Complex decimals: `1.2.3G`
-- Missing numbers: `G`, `MB`
-
-### Memory Ranges
-- Very small: 64MB
-- Small: 128MB, 256MB, 512MB
-- Medium: 1GB, 2GB, 4GB
-- Large: 8GB, 16GB
-- Very large: 1TB+
-
-### JVM Parameters
-- Thread counts: 50-1000 threads
-- Loaded classes: 3500-50000 classes
-- Head room: 0-50%
-- Various memory configurations
-
-### Container Scenarios
-- No memory limit detected (fallback to host detection)
-- cgroups v1 memory limits
-- cgroups v2 memory limits
-- Unrealistic memory limits (filtered out)
-- File system errors and missing files
-- Host memory detection fallback when cgroups unavailable
-- Cross-platform host detection (Linux `/proc/meminfo`, macOS heuristics)
-
-### Platform Support Testing
-- Linux: `/proc/meminfo` parsing with various formats
-- macOS: Heuristic-based memory detection
-- Cross-platform compatibility validation
-
-### GitHub Actions Testing
-The project uses comprehensive **automated testing** via GitHub Actions on every push and pull request:
-
-#### Test Pipeline Components
-1. **Go Environment Setup**: Tests on Go 1.25.5 with module caching
-2. **Dependency Verification**: Downloads and verifies all Go modules
-3. **Module Structure Check**: Validates project structure and build process
-4. **Race Detection**: Runs all tests with `-race` flag for concurrency issues
-5. **Coverage Analysis**: Generates coverage reports and summaries
-6. **Integration Testing**: Includes separate integration test execution
-7. **Quality Assurance**: Multiple quality gates including:
-   - **golangci-lint**: Comprehensive linting with custom configuration
-   - **gosec**: Security vulnerability scanning
-   - **govulncheck**: Known vulnerability database checking
-
-#### Multi-Platform Build Testing
-GitHub Actions validates builds across all supported platforms:
-- **Linux**: amd64, arm64
-- **macOS**: amd64, arm64 (Apple Silicon)
-- **Cross-compilation**: CGO disabled for portable binaries
-
-#### Coverage Reporting
-- **Local Coverage**: `make coverage` provides detailed per-package statistics
-- **CI Coverage**: GitHub Actions uploads to Codecov for tracking
-- **Coverage Gates**: PRs cannot decrease coverage significantly
-
-#### Automated Release Testing
-On git tags (`v*`), additional testing includes:
-- **Multi-platform builds**: All platform binaries built and tested
-- **Integration testing**: Complete end-to-end testing with built binaries
-- **Checksum validation**: SHA256 checksums generated and verified
-- **Docker testing**: Multi-arch container builds and basic functionality tests
-- macOS: Heuristic-based detection without CGO dependencies
-- Unsupported platforms: Graceful handling with zero values
-- Platform detection priority: cgroups v2 → cgroups v1 → host system
-
-## Comprehensive Edge Cases Covered
-
-The test suite includes extensive testing for complex scenarios and edge cases:
-
-### 1. Calculator Package (`internal/calc`)
-- **Memory Boundary Testing**: Very small (64KB) to very large (32GB) memory configurations
-- **JVM Flag Parsing**: Complex multi-flag combinations with validation
-- **Error Handling**: Invalid size formats, parsing failures, memory constraints
-- **Thread Count Edge Cases**: Zero threads, extreme thread counts (10,000+)
-- **Class Count Impact**: Testing metaspace calculation with varying class counts (1K to 1M classes)
-- **Head Room Calculations**: Testing different head room percentages
-- **Memory Allocation Failures**: Scenarios where memory requirements exceed available memory
-
-### 2. Count Package (`internal/count`)
-- **ZIP/JAR File Handling**: Nested JARs, invalid ZIP files, zero-byte files
-- **File System Edge Cases**: Permission denied scenarios, deep directory nesting
-- **Multiple File Extensions**: .class, .classdata, .clj, .groovy, .kts support
-- **Modules File Testing**: Java 9+ module system support with size-based estimation
-- **Error Recovery**: Graceful handling of corrupted files and missing paths
-
-### 3. Errors Package (`pkg/errors`)
-- **Error Chaining**: Multi-level error wrapping and unwrapping
-- **Context Preservation**: Complex context data with nested structures
-- **Error Interface Compliance**: Standard library integration testing
-- **Formatting Edge Cases**: Various error message formatting scenarios
-
-### 4. Constants Package (`internal/constants`)
-- **Constant Value Verification**: All constants have expected values
-- **Type Safety**: All constants use correct Go types
-- **Relationship Validation**: Memory limits have logical relationships
-- **Path Validation**: All system paths are absolute paths
-- **Environment Variable Consistency**: BPL/BPI prefix validation
-The professional package architecture with enhanced host detection provides excellent maintainability and testability while achieving high code coverage.
+The legacy release filenames containing `minimal` are compatibility aliases of the tested standard
+binary, not a separate build. They are deprecated and will be removed in the next major release.
