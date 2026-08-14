@@ -1,466 +1,165 @@
-# Contributing to JVM Memory Calculator
+# Contributing
 
-Thank you for your interest in contributing to the JVM Memory Calculator! This document provides guidelines and information for contributors.
+Contributions are welcome. This project is small enough that every change should be easy to reason
+about, test locally and review as a focused diff.
 
-## Table of Contents
+## Set up
 
-- [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
-- [Development Workflow](#development-workflow)
-- [Testing](#testing)
-- [Code Style](#code-style)
-- [Submitting Changes](#submitting-changes)
-- [Release Process](#release-process)
+Requirements:
 
-## Code of Conduct
-
-This project follows a simple code of conduct:
-
-- Be respectful and inclusive
-- Focus on constructive feedback
-- Help others learn and grow
-- Assume good intentions
-
-## Getting Started
-
-### Prerequisites
-
-- Go 1.25.5 or later
+- Go 1.25 or later
 - Git
-- Make (optional, but recommended)
-
-### Setting up the Development Environment
-
-1. Fork the repository on GitHub
-2. Clone your fork:
-   ```bash
-   git clone https://github.com/yourusername/memory-calculator.git
-   cd memory-calculator
-   ```
-
-3. Add the upstream remote:
-   ```bash
-   git remote add upstream https://github.com/patbaumgartner/memory-calculator.git
-   ```
-
-4. Install dependencies:
-   ```bash
-   make deps
-   # or
-   go mod download
-   ```
-
-5. Run tests to ensure everything works:
-   ```bash
-   make test
-   # or
-   go test -v ./...
-   ```
-
-## Project Structure
-
-```
-memory-calculator/
-├── cmd/                      # Application entry points
-│   └── memory-calculator/
-│       └── main.go           # Main application entry point
-├── internal/                 # Private application packages
-│   ├── calc/                # Core calculation with build variants
-│   ├── calculator/          # Calculator orchestration
-│   ├── cgroups/             # Container memory detection
-│   ├── config/              # Configuration management
-│   ├── count/               # Class counting with build variants
-│   ├── display/             # Output formatting
-│   ├── host/                # Host memory detection
-│   ├── logger/              # Logging utilities
-│   ├── memory/              # Memory parsing logic
-│   └── parser/              # Flag parsing utilities
-├── pkg/                     # Public packages
-│   └── errors/              # Structured error handling
-├── examples/                 # Usage examples and scripts
-├── testdata/                # Test data and fixtures
-├── .github/                 # GitHub Actions and templates
-└── dist/                    # Build artifacts (generated)
-```
-
-## Development Tools
-
-The project includes a comprehensive Makefile to automate common tasks.
-
-### Key Makefile Commands
-
-- **Build**:
-  - `make build` - Build binary for current platform
-  - `make build-all` - Build binaries for all supported platforms
-  - `make build-minimal` - Build size-optimized minimal binary
-  - `make build-compressed` - Build UPX-compressed binary (requires UPX)
-
-- **Test**:
-  - `make test` - Run all tests
-  - `make test-coverage` - Run tests with coverage reporting
-  - `make integration` - Run only integration tests
-  - `make quality` - Run all quality checks (format, lint, security)
-
-- **Development**:
-  - `make deps` - Download dependencies
-  - `make format` - Format Go code
-  - `make lint` - Run linter
-  - `make clean` - Remove build artifacts
-
-## Development Workflow
-
-### Branch Naming
-
-Use descriptive branch names:
-- `feature/add-new-memory-units` - for new features
-- `fix/cgroups-detection-bug` - for bug fixes
-- `docs/update-readme` - for documentation changes
-- `refactor/cleanup-parser` - for code improvements
-
-### Making Changes
-
-1. Create a new branch from `main`:
-   ```bash
-   git checkout main
-   git pull upstream main
-   git checkout -b feature/your-feature-name
-   ```
-
-2. Make your changes following the [code style guidelines](#code-style)
-
-3. Add tests for new functionality:
-   ```bash
-   # Run tests frequently during development
-   make test
-   
-   # Check coverage
-   make coverage
-   ```
-
-4. Update documentation if needed
-
-5. Commit your changes with descriptive commit messages:
-   ```bash
-   git add .
-   git commit -m "feat: add support for PB/petabyte memory units"
-   ```
-
-### Commit Message Format
-
-We follow the [Conventional Commits](https://conventionalcommits.org/) specification:
-
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer(s)]
-```
-
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code formatting (no logic changes)
-- `refactor`: Code refactoring
-- `test`: Adding or updating tests
-- `chore`: Maintenance tasks
-
-**Examples:**
-```bash
-feat: add support for petabyte memory units
-fix: resolve cgroups v2 detection on newer kernels  
-docs: update installation instructions
-test: add integration tests for quiet mode
-refactor: simplify memory parsing logic
-```
-
-## Testing
-
-### Test Types
-
-- **Unit Tests**: Test individual functions and components
-- **Integration Tests**: Test the full binary with various inputs
-- **Build Constraint Tests**: Test both standard and minimal build variants
-- **Cross-Build Tests**: Ensure consistency across build variants
-- **Benchmark Tests**: Performance testing for critical paths
-
-### Build Variants
-
-The project supports multiple build variants:
+- GNU Make
+- Optional: Docker, `golangci-lint`, `gosec`, `govulncheck`
 
 ```bash
-# Standard build (full features)
-go build ./cmd/memory-calculator
-
-# Minimal build (size optimized)
-go build -tags minimal ./cmd/memory-calculator
-
-# Test both variants
-make test-variants
-```
-
-### Running Tests
-
-```bash
-# Run all tests (including build constraints)
+git clone https://github.com/patbaumgartner/memory-calculator.git
+cd memory-calculator
+go mod download   # there are currently no external modules
 make test
-
-# Run with coverage
-make coverage
-
-# Test both build variants
-bash .github/workflows/test-local.sh
-
-# Run specific test files
-go test -v ./internal/calc/build_constraints_test.go
-go test -tags minimal -v ./internal/count/minimal_build_test.go
+make build
+./memory-calculator --total-memory=2G --loaded-class-count=5000
 ```
 
-### Writing Tests
+## Project map
 
-1. **Test file naming**: `*_test.go`
-2. **Test function naming**: `TestFunctionName`
-3. **Use table-driven tests** for multiple test cases:
+| Path | Responsibility |
+|------|----------------|
+| `cmd/memory-calculator` | CLI flags, exits, error reporting |
+| `internal/config` | flags and environment configuration |
+| `internal/calculator` | orchestration and typed result |
+| `internal/calc` | memory algorithm and JVM option grammar |
+| `internal/cgroups`, `internal/host` | memory-limit detection |
+| `internal/count` | class counting |
+| `internal/parser`, `internal/memory` | option and size parsing |
+| `internal/display` | human and quiet output |
+| `pkg/errors` | importable structured errors |
 
-```go
-func TestParseMemoryString(t *testing.T) {
-    tests := []struct {
-        name     string
-        input    string
-        expected int64
-        hasError bool
-    }{
-        {"Valid GB", "2G", 2147483648, false},
-        {"Invalid unit", "2X", 0, true},
-    }
+Read [ARCHITECTURE.md](ARCHITECTURE.md) before changing the algorithm or detection order.
 
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            result, err := parseMemoryString(tt.input)
-            if tt.hasError && err == nil {
-                t.Errorf("Expected error but got none")
-            }
-            if !tt.hasError && result != tt.expected {
-                t.Errorf("Expected %d, got %d", tt.expected, result)
-            }
-        })
-    }
-}
-```
+## Workflow
 
-### Test Coverage Requirements
-
-- New features must include tests
-- Aim for >90% coverage on new code
-- Critical paths must have comprehensive test coverage
-- Integration tests for CLI functionality
-
-## Code Style
-
-### Go Standards
-
-- Follow standard Go conventions
-- Use `gofmt` for formatting
-- Use `golint` for linting
-- Write clear, self-documenting code
-
-### Formatting
+1. Create a branch from `main`.
+2. Reproduce the problem with a failing test.
+3. Make the smallest change that fixes the root cause.
+4. Run the focused test, then the full suite with the race detector.
+5. Run the smoke test through the real binary.
+6. Update README/API/architecture docs when the public contract changes.
+7. Keep commits small, green and independently reviewable.
 
 ```bash
-# Format code
-make format
-# or
-gofmt -s -w .
-
-# Run linter (if installed)
-make lint
-# or  
-golangci-lint run
+go test -count=1 ./internal/calc/ -run TestName
+go test -count=1 -race ./...
+./test-local.sh
+make quality
 ```
 
-### Documentation
+The repository normalizes text files to LF through `.gitattributes`. `gofmt -l .` must produce no
+output.
 
-- Add comments for exported functions
-- Include usage examples in complex functions
-- Update README.md for new features
-- Use godoc-style comments:
+## Make targets
 
-```go
-// ParseMemoryString converts a memory string (e.g., "2G", "512M") to bytes.
-// Supported units: B, K, KB, M, MB, G, GB, T, TB (case insensitive).
-// Returns the memory in bytes and an error if the format is invalid.
-func ParseMemoryString(memory string) (int64, error) {
-    // implementation
-}
+Run `make help` for the authoritative list. The most useful targets are:
+
+```bash
+make build          # current platform
+make build-all      # linux/darwin, amd64/arm64
+make test           # race-enabled package tests
+make integration    # real-binary subprocess tests
+make coverage       # coverage profile and report
+make quality        # format, lint, security and vulnerability checks
+make docker-build   # build the release image
+make release-check  # pre-release checks
 ```
 
-## Submitting Changes
+## Testing standards
 
-### Pull Request Process
+A meaningful change needs a test at the right level:
 
-1. **Push your branch** to your fork:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
+- **Parser or calculation change**: table-driven unit tests for accepted and rejected input.
+- **Bug fix**: a regression test reproducing the original failure.
+- **Memory arithmetic**: assert the invariant (regions fit the budget), not just one expected number.
+- **Cgroup behavior**: build an on-disk fixture tree; do not make tests depend on the host cgroup.
+- **CLI behavior**: extend `integration_test.go` or `test-local.sh` and assert exit status, stdout and
+  stderr separately.
+- **Documentation-only change**: verify every command and numeric claim against the repository.
 
-2. **Create a Pull Request** on GitHub:
-   - GitHub will automatically use our pull request template
-   - Fill out all sections of the template
-   - Use a descriptive title following [Conventional Commits](https://conventionalcommits.org/)
-   - Reference any related issues using keywords (e.g., "Fixes #123")
-   - Provide a clear description of changes
-   - Include testing information and screenshots if applicable
+Use `t.Setenv`, `t.TempDir` and subtests. Do not call `t.Parallel` in tests that mutate package globals
+or process-wide state. Never delete a failing test or reduce its assertion to make CI green.
 
-3. **Automated GitHub Actions** will run:
-   - ✅ **Test Suite**: Complete test suite with race detection
-   - ✅ **Coverage**: Coverage analysis and reporting
-   - ✅ **Linting**: golangci-lint with project configuration
-   - ✅ **Security**: gosec security scanning
-   - ✅ **Vulnerabilities**: govulncheck vulnerability scanning
-   - ✅ **Cross-Platform**: Build verification for all platforms
+Current total statement coverage is 84.8%. Coverage is a signal, not the objective: `internal/count`
+has the lowest percentage because archive and I/O error paths are expensive to enumerate, while the
+safety-critical calculator and detectors are above 85% and carry invariant tests.
 
-4. **Pull Request Template** includes:
-   - Description and type of change checkboxes
-   - Testing checklist (unit tests, integration tests, manual testing)
-   - Documentation update confirmation
-   - Breaking changes description (if applicable)
-   - Performance impact assessment
+## Code style
 
-### Review Process
+- Follow idiomatic Go and the existing package boundaries.
+- Return errors with context and preserve causes with `%w`.
+- Prefer typed structs over `map[string]string` when values have a known schema.
+- Avoid global mutable state; environment variables belong at the application edge.
+- Validate untrusted input at that edge and validate domain invariants in the domain package too.
+- Keep comments for decisions and invariants the code cannot express; do not narrate obvious code.
+- Do not add a dependency for behavior the standard library implements clearly.
+- Do not introduce a second implementation of the calculation behind a build tag.
 
-1. **Automated Checks**: All GitHub Actions must pass ✅
-   - Test suite must have 100% pass rate
-   - Coverage should not decrease significantly
-   - No linting errors or security issues
-   - All platforms must build successfully
+The configured linters include `govet`, `staticcheck`, `gosec`, `errcheck`, `revive`, `gocyclo`,
+`goconst`, `misspell`, `unused`, `ineffassign` and a 120-character line-length check.
 
-2. **Code Review**: Maintainers will review:
-   - Code quality and adherence to Go standards
-   - Test coverage for new functionality
-   - Documentation updates
-   - Breaking change compatibility
+## Commit messages
 
-3. **Feedback**: Address any requested changes:
-   - Push additional commits to your branch
-   - GitHub Actions will re-run automatically
-   - Respond to review comments
+Use conventional commits:
 
-4. **Approval & Merge**: Once approved:
-   - Squash and merge is preferred for clean history
-   - Commit message should follow [Conventional Commits](https://conventionalcommits.org/)
-   - PR will be automatically closed
+```
+fix(cgroups): honour ancestor memory limits
+feat(cli): add a machine-readable output format
+test(calc): cover size overflow
+docs: correct memory allocation formula
+refactor(calculator): return a typed result
+```
 
-### Issue Reporting
+A good commit explains why the behavior changes, includes its tests and leaves the repository green.
+Do not mix an unrelated cleanup into a bug fix.
 
-Use GitHub Issues with our templates:
+## Pull requests
 
-- **🐛 Bug Report**: Use the bug report template with:
-  - Environment details (OS, architecture, version)
-  - Steps to reproduce
-  - Expected vs actual behavior
-  - Command used and output
+A pull request should state:
 
-- **✨ Feature Request**: Use the feature request template with:
-  - Clear use case description
-  - Proposed implementation approach
-  - Alternatives considered
+- the problem and its impact;
+- the root cause;
+- the chosen fix and trade-offs;
+- how it was tested;
+- any compatibility or release note implications.
 
-- **❓ Question**: Use the question template for:
-  - Usage questions
-  - Clarifications about behavior
-  - General support requests
+Before opening one:
 
-## Release Process
+```bash
+gofmt -l .                 # no output
+make test
+./test-local.sh
+make quality
+```
 
-### Versioning
+CI must pass on the supported Go version and all release targets.
 
-We follow [Semantic Versioning](https://semver.org/):
-- `MAJOR.MINOR.PATCH` (e.g., `1.2.3`)
-- Major: Breaking changes
-- Minor: New features (backward compatible)  
-- Patch: Bug fixes (backward compatible)
+## Compatibility
 
-### Automated Release Workflow (Maintainers Only)
+The public contract is the CLI, its environment variables, stdout/stderr behavior, exit codes and
+release artifact names. Packages under `internal/` are intentionally not importable.
 
-Releases are **fully automated** using GitHub Actions:
+Behavior that can prevent an OOM kill may justify a compatibility break, but call it out prominently
+in the changelog. For an artifact rename, preserve an alias for a transition release when practical.
 
-1. **Prepare Release**:
-   ```bash
-   # Ensure all changes are merged to main
-   git checkout main
-   git pull origin main
-   
-   # Verify everything is ready
-   make release-check
-   make test
-   make quality
-   ```
+## Security
 
-2. **Create Release Tag**:
-   ```bash
-   # Create and push version tag
-   git tag v1.2.0
-   git push origin v1.2.0
-   ```
+Do not report vulnerabilities in a public issue. Follow [SECURITY.md](SECURITY.md). For routine code,
+consider:
 
-3. **Automated GitHub Actions**:
-   - ✅ Runs complete test suite
-   - ✅ Performs security and vulnerability scans
-   - ✅ Builds binaries for all platforms (Linux/macOS, amd64/arm64)
-   - ✅ Creates GitHub release with auto-generated notes
-   - ✅ Uploads all artifacts with SHA256 checksums
-   - ✅ Builds and pushes multi-arch Docker images
-   - ✅ Updates package registries
+- integer overflow in size arithmetic;
+- archive decompression limits;
+- paths derived from user input;
+- shell interpolation in examples and CI;
+- whether a failure defaults safely or silently continues with a wrong budget.
 
-4. **Release Artifacts**:
-   - `memory-calculator-linux-amd64` - Linux x86_64 binary
-   - `memory-calculator-linux-arm64` - Linux ARM64 binary
-   - `memory-calculator-darwin-amd64` - macOS Intel binary
-   - `memory-calculator-darwin-arm64` - macOS Apple Silicon binary
-   - `checksums.txt` - SHA256 checksums
-   - Docker images on Docker Hub
+## License
 
-### Pre-Release Checklist
-
-Before creating a release tag:
-
-- [ ] All PRs merged and main branch updated
-- [ ] `make test` passes
-- [ ] `make quality` passes (format, lint, security, vulnerabilities)
-- [ ] CHANGELOG.md updated with new version
-- [ ] Version numbers updated in relevant files
-- [ ] Breaking changes documented
-- [ ] Release notes prepared (or rely on auto-generation)
-
-### Emergency Releases
-
-For critical bug fixes:
-
-1. Create hotfix branch from latest release tag
-2. Apply minimal fix
-3. Create new patch version tag
-4. GitHub Actions will handle the rest
-
-### Release Communication
-
-Releases are automatically announced via:
-- GitHub Releases page with detailed notes
-- Docker Hub with updated images
-- Package registries (when configured)
-
-## Getting Help
-
-- **Issues**: Report bugs or request features via [GitHub Issues](https://github.com/patbaumgartner/memory-calculator/issues)
-- **Discussions**: Ask questions in [GitHub Discussions](https://github.com/patbaumgartner/memory-calculator/discussions)  
-- **Documentation**: Check the [README](README.md) and inline code documentation
-- **Contact**: Patrick Baumgartner <contact@patbaumgartner.com>
-
-## Recognition
-
-Contributors will be:
-- Listed in the project's contributors
-- Mentioned in release notes for significant contributions
-- Invited to be maintainers for sustained, quality contributions
-
-Thank you for contributing to the JVM Memory Calculator! 🎉
+By contributing, you agree that your work is licensed under the repository's MIT license.

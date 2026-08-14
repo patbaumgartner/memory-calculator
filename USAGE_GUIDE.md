@@ -135,10 +135,10 @@ ENTRYPOINT ["/startup.sh"]
 ### Multi-Stage Build
 ```dockerfile
 # Build stage - compile memory calculator
-FROM golang:1.25.5 as calculator-builder
+FROM golang:1.25.5 AS calculator-builder
 WORKDIR /build
 COPY . .
-RUN make build-minimal
+RUN make build
 
 # Runtime stage
 FROM bellsoft/liberica-runtime-container:jdk-21-slim-musl
@@ -414,15 +414,15 @@ The `--path` parameter enables intelligent class count estimation by scanning JA
 ./memory-calculator --path=/opt/myapp --total-memory=4G
 
 # The calculator will:
-# 1. Scan all JAR files in /opt/myapp recursively
-# 2. Count classes in each JAR
-# 3. Apply framework-specific scaling factors (Spring Boot, etc.)
-# 4. Display "Loaded Classes: auto-calculated from /opt/myapp"
+# 1. Scan JARs and loose class files under /opt/myapp recursively
+# 2. Count class-like entries, including one level of nested JARs
+# 3. Add the JVM base count and apply the configured adjustment factor
+# 4. Display the resolved class count used to size metaspace
 ```
 
 **Benefits:**
 - More accurate metaspace allocation
-- Framework-aware class counting
+- One-level nested JAR support
 - Eliminates need to manually specify class counts
 - Clear display of calculation source
 
