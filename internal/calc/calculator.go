@@ -255,7 +255,7 @@ func (c Calculator) setHeap(flag string, m *MemoryRegions) error {
 		return fmt.Errorf("unable to parse heap\n%w", err)
 	}
 	h.Provenance = UserConfigured
-	m.Heap = h
+	m.Heap = &h
 	return nil
 }
 
@@ -266,7 +266,7 @@ func (c Calculator) setMetaspace(flag string, m *MemoryRegions) error {
 		return fmt.Errorf("unable to parse metaspace\n%w", err)
 	}
 	ms.Provenance = UserConfigured
-	m.Metaspace = ms
+	m.Metaspace = &ms
 	return nil
 }
 
