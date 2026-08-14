@@ -91,6 +91,9 @@ func main() {
 	if err := cfg.Validate(); err != nil {
 		fail(err)
 	}
+	for _, warning := range cfg.Warnings {
+		fmt.Fprintf(os.Stderr, "memory-calculator: warning: %s\n", warning)
+	}
 
 	// Execute memory calculator
 	mc := calculator.Create(cfg.Quiet)

@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -279,10 +280,16 @@ func TestLoadDeprecatedHeadRoomPrecedence(t *testing.T) {
 	if got := Load().HeadRoom; got != "10" {
 		t.Errorf("deprecated-only HeadRoom = %q, want 10", got)
 	}
+	if warnings := Load().Warnings; len(warnings) != 1 || !strings.Contains(warnings[0], "deprecated") {
+		t.Errorf("deprecated-only Warnings = %v, want one deprecation warning", warnings)
+	}
 
 	t.Setenv("BPL_JVM_HEAD_ROOM", "20")
 	if got := Load().HeadRoom; got != "20" {
 		t.Errorf("new HeadRoom = %q, want 20 to override the deprecated value", got)
+	}
+	if warnings := Load().Warnings; len(warnings) != 1 || !strings.Contains(warnings[0], "ignored") {
+		t.Errorf("both-key Warnings = %v, want one ignored-value warning", warnings)
 	}
 }
 

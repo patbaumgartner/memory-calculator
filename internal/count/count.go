@@ -76,32 +76,40 @@ func JarClasses(path string) (int, error) {
 			return nil
 		}
 
-		z, err := zip.OpenReader(path)
+		jarCount, err := classesInJar(path)
+		if errors.Is(err, zip.ErrFormat) {
+			return nil
+		}
 		if err != nil {
-			if !(errors.Is(err, zip.ErrFormat)) {
-				return fmt.Errorf("unable to open Jar %s\n%w", path, err)
-			} else {
-				return nil
-			}
+			return fmt.Errorf("unable to count classes in JAR %s\n%w", path, err)
 		}
-		defer func() { _ = z.Close() }()
-
-		for _, f := range z.File {
-			if strings.HasSuffix(f.FileInfo().Name(), ".jar") {
-				c, err := nestedJarContents(f)
-				if err != nil {
-					return fmt.Errorf("unable to count nested jar\n%w", err)
-				}
-				count += c
-			}
-			count += jarContents(f)
-		}
-
+		count += jarCount
 		return nil
 	}); err != nil {
 		return 0, fmt.Errorf("unable to walk %s\n%w", path, err)
 	}
 
+	return count, nil
+}
+
+func classesInJar(path string) (int, error) {
+	z, err := zip.OpenReader(path)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = z.Close() }()
+
+	count := 0
+	for _, file := range z.File {
+		if strings.HasSuffix(file.FileInfo().Name(), ".jar") {
+			nested, err := nestedJarContents(file)
+			if err != nil {
+				return 0, fmt.Errorf("unable to count nested JAR\n%w", err)
+			}
+			count += nested
+		}
+		count += jarContents(file)
+	}
 	return count, nil
 }
 

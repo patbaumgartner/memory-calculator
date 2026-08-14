@@ -131,6 +131,14 @@ func TestMainIntegration(t *testing.T) {
 				"Head Room:        10%",
 			},
 		},
+		{
+			name: "Deprecated head room warns under quiet mode",
+			args: []string{"--total-memory", "2G", "--loaded-class-count", "5000", "--quiet"},
+			expectedOutput: []string{
+				"BPL_JVM_HEADROOM is deprecated",
+				"-Xmx",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -150,6 +158,9 @@ func TestMainIntegration(t *testing.T) {
 				)
 			} else {
 				env = append(env, "BPL_JVM_LOADED_CLASS_COUNT=30000")
+			}
+			if strings.Contains(tt.name, "Deprecated head room") {
+				env = append(env, "BPL_JVM_HEADROOM=10", "BPL_JVM_HEAD_ROOM=")
 			}
 
 			cmd.Env = env
