@@ -55,7 +55,7 @@ build-all: ## Build binaries for all platforms
 
 	@echo "Building static linked binaries..."
 	# Linux amd64
-	GOOS=linux GOARCH=amd64 GO_ENABLED=1 $(GOBUILD) $(BUILD_FLAGS) -installsuffix cgo -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w -linkmode external -extldflags '-static'" -o $(DIST_DIR)/$(BINARY_NAME)-static-amd64 ./cmd/memory-calculator
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=1 $(GOBUILD) $(BUILD_FLAGS) -installsuffix cgo -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w -linkmode external -extldflags '-static'" -o $(DIST_DIR)/$(BINARY_NAME)-static-amd64 ./cmd/memory-calculator
 
 	# Linux arm64
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc $(GOBUILD) $(BUILD_FLAGS) -installsuffix cgo -ldflags "-X main.version=${VERSION} -X main.buildTime=${BUILD_TIME} -X main.commitHash=${COMMIT_HASH} -s -w -linkmode external -extldflags '-static'" -o $(DIST_DIR)/$(BINARY_NAME)-static-arm64 ./cmd/memory-calculator
@@ -169,6 +169,8 @@ vuln-check: ## Check for known vulnerabilities
 		$(GOBIN)/govulncheck ./...; \
 	fi
 
+vulncheck: vuln-check ## Check for known vulnerabilities (alias for vuln-check)
+
 vuln-install: ## Install vulnerability checker
 	@echo "Installing vulnerability checker..."
 	$(GOCMD) install golang.org/x/vuln/cmd/govulncheck@latest
@@ -205,7 +207,7 @@ lint: ## Run linter (requires golangci-lint)
 		$(GOLANGCI_LINT) run; \
 	else \
 		echo "golangci-lint not found. Installing..."; \
-		$(GOCMD) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
+		$(GOCMD) install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest; \
 		$(GOBIN)/golangci-lint run; \
 	fi
 
@@ -251,10 +253,10 @@ docker-run: ## Run Docker container
 
 docker-test: ## Test Docker container with memory limit
 	@echo "Testing Alpine Docker image..."
-	docker run --rm $(BINARY_NAME):alpine --version
-	docker run --rm $(BINARY_NAME):alpine --help
+	docker run --rm $(BINARY_NAME):latest --version
+	docker run --rm $(BINARY_NAME):latest --help
 	@echo "Testing with memory limits..."
-	docker run --rm --memory=1g $(BINARY_NAME):alpine --loaded-class-count=999 --total-memory=1G
+	docker run --rm --memory=1g $(BINARY_NAME):latest --loaded-class-count=999 --total-memory=1G
 
 ## Help
 help: ## Show this help message
