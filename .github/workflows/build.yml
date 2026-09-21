@@ -80,7 +80,7 @@ jobs:
 
     - name: Check for vulnerabilities
       run: |
-        go install golang.org/x/vuln/cmd/govulncheck@latest
+        go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
         govulncheck ./...
 
     - name: Upload coverage reports to Codecov
