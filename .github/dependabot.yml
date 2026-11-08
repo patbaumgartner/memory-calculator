@@ -37,6 +37,10 @@ updates:
   labels:
   - dependencies
   - github-actions
+  groups:
+    multi-step-actions:
+      patterns:
+      - github/codeql-action/*
 - package-ecosystem: docker
   directory: /
   schedule:
@@ -55,7 +59,3 @@ updates:
   labels:
   - dependencies
   - docker
-groups:
-  multi-step-actions:
-    patterns:
-    - github/codeql-action/*
